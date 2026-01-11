@@ -76,7 +76,10 @@ export const translations = {
     clearFilters: "Clear",
     printReport: "Print Report",
     exportExcel: "Export Excel",
-    applyFilters: "Apply Filters"
+    applyFilters: "Apply Filters",
+    futureDateError: "Future dates are not allowed",
+    payBill: "Pay Bill",
+    paid: "Paid"
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -154,6 +157,9 @@ export const translations = {
     clearFilters: "මකන්න",
     printReport: "වාර්තාව මුද්‍රණය",
     exportExcel: "Excel අපනයනය",
-    applyFilters: "පෙරහන් යොදන්න"
+    applyFilters: "පෙරහන් යොදන්න",
+    futureDateError: "අනාගත දින ඇතුළත් කළ නොහැක",
+    payBill: "ගෙවීම සිදු කරන්න",
+    paid: "ගෙවා ඇත"
   }
 };

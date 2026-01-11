@@ -41,6 +41,18 @@ const App: React.FC = () => {
       : `${formattedAmount} ${currencySettings.symbol}`;
   }, [currencySettings]);
 
+  // Calculate the absolute latest balance from all transactions
+  const latestBalance = useMemo(() => {
+    if (transactions.length === 0) return 0;
+    // Sort by date and then by timestamp to find the actual last record
+    const sorted = [...transactions].sort((a, b) => {
+      const dateDiff = a.date.localeCompare(b.date);
+      if (dateDiff !== 0) return dateDiff;
+      return a.timestamp.localeCompare(b.timestamp);
+    });
+    return Number(sorted[sorted.length - 1].totalBalance) || 0;
+  }, [transactions]);
+
   const generateNotifications = useCallback(async (txs: Transaction[]) => {
     const budgets = await storageService.fetchBudgets();
     const bills = await storageService.fetchBills();
@@ -70,16 +82,13 @@ const App: React.FC = () => {
       });
     }
 
-    // 2. Bill Due Date System (7-Day Prioritized Lookahead)
+    // 2. Bill Due Date System
     bills.forEach(bill => {
       const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
       let dueDate = new Date(now.getFullYear(), now.getMonth(), bill.dueDay);
-      
-      // Target next month if day has passed
       if (dueDate < today) {
         dueDate = new Date(now.getFullYear(), now.getMonth() + 1, bill.dueDay);
       }
-
       const diffTime = dueDate.getTime() - today.getTime();
       const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 
@@ -99,17 +108,7 @@ const App: React.FC = () => {
     setNotifications(prev => {
       const existingIds = new Set(prev.map(n => n.id));
       const added = newNotifications.filter(n => !existingIds.has(n.id));
-      // Sort: highest priority and newest first
-      return [...added, ...prev]
-        .filter(n => {
-          // Cleanup logic: If it's a bill notification, ensure it's still relevant
-          if (n.type === 'bill') {
-            const billId = n.id.split('-')[1];
-            return bills.some(b => b.id === billId);
-          }
-          return true;
-        })
-        .slice(0, 30);
+      return [...added, ...prev].slice(0, 30);
     });
   }, [t]);
 
@@ -153,8 +152,6 @@ const App: React.FC = () => {
     loadData();
   }, [loadData]);
 
-  const unreadCount = useMemo(() => notifications.filter(n => !n.read).length, [notifications]);
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-20 md:pb-0 font-sans transition-colors duration-300">
       <nav className="hidden md:flex flex-col fixed h-full w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6 z-20 no-print transition-colors">
@@ -185,17 +182,11 @@ const App: React.FC = () => {
         </div>
 
         <div className="mt-auto space-y-2 border-t border-slate-100 dark:border-slate-800 pt-6">
-          <button 
-            onClick={() => setIsDark(!isDark)}
-            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all"
-          >
+          <button onClick={() => setIsDark(!isDark)} className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all">
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             {isDark ? t.lightMode : t.darkMode}
           </button>
-          <button 
-            onClick={() => setActiveTab('settings')}
-            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'settings' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'}`}
-          >
+          <button onClick={() => setActiveTab('settings')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all ${activeTab === 'settings' ? 'bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-800 dark:hover:text-slate-200'}`}>
             <Settings className="w-5 h-5" />
             {t.settings}
           </button>
@@ -214,28 +205,13 @@ const App: React.FC = () => {
         <div className="flex items-center gap-2">
           <button onClick={() => setIsNotificationOpen(true)} className="p-2 relative text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
             <Bell className="w-5 h-5" />
-            {unreadCount > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>}
+            {notifications.filter(n => !n.read).length > 0 && <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>}
           </button>
           <button onClick={() => setIsDark(!isDark)} className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">
             {isDark ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
           </button>
-          <button onClick={() => setActiveTab('settings')} className="p-2 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg"><Settings className="w-5 h-5"/></button>
         </div>
       </header>
-
-      <div className="hidden md:block fixed top-6 right-6 z-40 no-print">
-        <button 
-          onClick={() => setIsNotificationOpen(true)}
-          className="bg-white dark:bg-slate-900 p-3 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-xl dark:shadow-none hover:bg-slate-50 dark:hover:bg-slate-800 transition-all relative group"
-        >
-          <Bell className="w-6 h-6 text-slate-600 dark:text-slate-300 group-hover:text-indigo-600 dark:group-hover:text-indigo-400" />
-          {unreadCount > 0 && (
-            <span className="absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-black h-5 w-5 flex items-center justify-center rounded-full border-2 border-white dark:border-slate-900">
-              {unreadCount}
-            </span>
-          )}
-        </button>
-      </div>
 
       <main className="md:pl-64 min-h-screen">
         <div className="max-w-6xl mx-auto p-4 md:p-8">
@@ -262,6 +238,7 @@ const App: React.FC = () => {
               isLoading={isLoading}
               formatCurrency={formatCurrency}
               notifications={notifications}
+              latestBalance={latestBalance}
             />
           )}
         </div>
@@ -275,20 +252,6 @@ const App: React.FC = () => {
         onReadAll={() => setNotifications(prev => prev.map(n => ({...n, read: true})))}
         t={t}
       />
-
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 flex items-center justify-around p-3 z-30 shadow-[0_-4px_12px_rgba(0,0,0,0.05)] no-print transition-colors">
-        {[
-          { id: 'dashboard', icon: LayoutDashboard },
-          { id: 'analytics', icon: BarChart3 },
-          { id: 'budget', icon: Target },
-          { id: 'bills', icon: CreditCard },
-          { id: 'history', icon: History },
-        ].map(tab => (
-          <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`flex flex-col items-center gap-1 transition-colors ${activeTab === tab.id ? 'text-indigo-600 dark:text-indigo-400' : 'text-slate-400 dark:text-slate-600'}`}>
-            <tab.icon className="w-6 h-6" />
-          </button>
-        ))}
-      </nav>
     </div>
   );
 };

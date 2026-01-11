@@ -48,6 +48,7 @@ export interface Bill {
   amount: number;
   dueDay: number; // 1-31
   category: string;
+  lastPaidMonth?: string; // New: tracks the last month this bill was paid (e.g., "March 2025")
 }
 
 export interface Notification {

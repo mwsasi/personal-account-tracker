@@ -7,7 +7,7 @@ import MonthlyCharts from './MonthlyCharts';
 import HistoryTable from './HistoryTable';
 import BudgetManager from './BudgetManager';
 import BudgetPerformance from './BudgetPerformance';
-import { Plus, X, Calendar, BarChart3, ClipboardList, ArrowRight, Target, AlertCircle, Clock } from 'lucide-react';
+import { Plus, X, Calendar, BarChart3, ClipboardList, ArrowRight, Target, AlertCircle, Clock, History } from 'lucide-react';
 import { storageService } from '../services/googleSheets';
 
 interface DashboardProps {
@@ -22,6 +22,7 @@ interface DashboardProps {
   isLoading: boolean;
   formatCurrency: (amount: number) => string;
   notifications?: Notification[];
+  latestBalance?: number;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ 
@@ -35,7 +36,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   onRefresh,
   isLoading,
   formatCurrency,
-  notifications = []
+  notifications = [],
+  latestBalance = 0
 }) => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showBudgetForm, setShowBudgetForm] = useState(false);
@@ -77,47 +79,27 @@ const Dashboard: React.FC<DashboardProps> = ({
   }, [budgets, selectedMonth]);
 
   const currentMonthTransactions = useMemo(() => {
-    return transactions.filter(tx => tx.month?.trim() === selectedMonth).sort((a, b) => a.date.localeCompare(b.date));
+    return transactions
+      .filter(tx => tx.month?.trim() === selectedMonth)
+      .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
   }, [transactions, selectedMonth]);
 
-  const categorySpending = useMemo(() => {
-    const totals = { groceries: 0, vegetables: 0, fishEgg: 0, chicken: 0, houseRent: 0, electricity: 0, water: 0, travel: 0, others: 0 };
-    currentMonthTransactions.forEach(tx => {
-      totals.groceries += Number(tx.groceries) || 0;
-      totals.vegetables += Number(tx.vegetables) || 0;
-      totals.fishEgg += Number(tx.fishEgg) || 0;
-      totals.chicken += Number(tx.chicken) || 0;
-      totals.houseRent += Number(tx.houseRent) || 0;
-      totals.electricity += Number(tx.electricity) || 0;
-      totals.water += Number(tx.water) || 0;
-      totals.travel += Number(tx.travel) || 0;
-      totals.others += Number(tx.others) || 0;
-    });
-    return totals;
-  }, [currentMonthTransactions]);
-
   const filteredStats = useMemo(() => {
-    const sorted = [...currentMonthTransactions].sort((a, b) => a.date.localeCompare(b.date));
-    
-    // 1. Total Expenses: Sum of all category fields across all transactions of the month
-    const totalSpent = currentMonthTransactions.reduce((sum, tx) => {
-      const txExp = Number(tx.groceries || 0) + Number(tx.vegetables || 0) + Number(tx.fishEgg || 0) + 
-                    Number(tx.chicken || 0) + Number(tx.houseRent || 0) + Number(tx.electricity || 0) + 
-                    Number(tx.water || 0) + Number(tx.travel || 0) + Number(tx.others || 0);
-      return sum + txExp;
-    }, 0);
-    
-    // 2. Total Cash Received + Brought Forward
+    const sorted = [...currentMonthTransactions].sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
+    const totalSpent = currentMonthTransactions.reduce((sum, tx) => sum + (Number(tx.totalExpenses) || 0), 0);
     const firstTx = sorted[0];
     const initialBF = firstTx ? (Number(firstTx.broughtForward) || 0) : 0;
     const totalDailyCash = currentMonthTransactions.reduce((sum, tx) => sum + (Number(tx.dailyCash) || 0), 0);
     const totalAvailableFunds = initialBF + totalDailyCash;
-    
-    // 3. Net Balance = (Initial BF + Sum Daily Cash) - Total Monthly Expenses
     const currentNetBalance = totalAvailableFunds - totalSpent;
-    
     return { totalSpent, totalReceived: totalAvailableFunds, lastBalance: currentNetBalance };
   }, [currentMonthTransactions]);
+
+  const recentTransactions = useMemo(() => {
+    return [...transactions]
+      .sort((a, b) => b.date.localeCompare(a.date) || b.timestamp.localeCompare(a.timestamp))
+      .slice(0, 5);
+  }, [transactions]);
 
   const handleEdit = (tx: Transaction) => {
     setEditingTransaction(tx);
@@ -182,109 +164,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {activeTab === 'dashboard' && (
         <>
-          {upcomingBillAlerts.length > 0 && (
-            <div className="animate-in slide-in-from-top-4 duration-500">
-              <div className="bg-indigo-600 text-white p-4 rounded-3xl shadow-xl shadow-indigo-200 dark:shadow-none flex flex-col md:flex-row items-center justify-between gap-4 overflow-hidden relative">
-                <div className="absolute top-0 right-0 p-4 opacity-10">
-                  <Clock className="w-24 h-24 rotate-12" />
-                </div>
-                <div className="flex items-center gap-4 relative z-10">
-                  <div className="p-3 bg-white/20 rounded-2xl">
-                    <Calendar className="w-6 h-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-black text-lg leading-tight uppercase tracking-tight">{t.dueSoon}</h3>
-                    <div className="flex flex-wrap gap-x-4 gap-y-1">
-                      {upcomingBillAlerts.map((n, i) => (
-                        <span key={n.id} className="text-sm font-medium flex items-center gap-1.5 text-white/90">
-                          <span className={`w-2 h-2 rounded-full ${n.priority === 'high' ? 'bg-rose-400 animate-pulse' : (n.priority === 'medium' ? 'bg-amber-400' : 'bg-sky-400')}`} />
-                          {n.title}: {n.message}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <button 
-                   onClick={() => setActiveTab?.('bills')}
-                   className="relative z-10 bg-white/20 hover:bg-white/30 text-white px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest transition-all backdrop-blur-sm"
-                >
-                  Manage Bills
-                </button>
-              </div>
-            </div>
-          )}
-
           <StatsOverview t={t} stats={filteredStats} formatCurrency={formatCurrency} />
 
-          <div className="mt-8 bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm transition-colors">
-            <div className="flex items-center justify-between mb-6">
-               <div className="flex items-center gap-3">
-                 <div className="p-2 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl text-emerald-600 dark:text-emerald-400">
-                    <Target className="w-6 h-6" />
-                 </div>
-                 <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t.budgetStatus}</h2>
-               </div>
-               <div className="text-[10px] text-slate-400 dark:text-slate-500 font-black uppercase tracking-widest">{selectedMonth}</div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-              {[
-                { key: 'groceries', label: t.groceries },
-                { key: 'vegetables', label: t.vegetables },
-                { key: 'fishEgg', label: t.fishEgg },
-                { key: 'chicken', label: t.chicken },
-                { key: 'houseRent', label: t.houseRent },
-                { key: 'electricity', label: t.electricity },
-                { key: 'water', label: t.water },
-                { key: 'travel', label: t.travel },
-                { key: 'others', label: t.others },
-              ].map(({ key, label }) => {
-                const limit = (activeBudget.limits as any)[key] || 0;
-                const spent = (categorySpending as any)[key] || 0;
-                const percent = limit > 0 ? (spent / limit) * 100 : 0;
-                const remaining = limit - spent;
-                
-                let barColor = "bg-indigo-500";
-                if (percent >= 100) barColor = "bg-rose-500";
-                else if (percent >= 80) barColor = "bg-amber-500";
-
-                return (
-                  <div key={key} className="space-y-2">
-                    <div className="flex justify-between items-end gap-2">
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 truncate">{label}</span>
-                      <div className="text-right shrink-0">
-                        <span className={`text-[10px] font-black uppercase tracking-tighter ${percent > 100 ? 'text-rose-500' : 'text-slate-400 dark:text-slate-500'}`}>
-                          {formatCurrency(spent)} / {limit > 0 ? formatCurrency(limit) : '---'}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden transition-colors">
-                      <div 
-                        className={`h-full transition-all duration-500 ${barColor}`} 
-                        style={{ width: `${Math.min(percent, 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex justify-between text-[10px] font-black uppercase tracking-tight">
-                       {limit > 0 ? (
-                         remaining >= 0 ? (
-                           <span className="text-emerald-500 dark:text-emerald-400 truncate">{t.remaining}: {formatCurrency(remaining)}</span>
-                         ) : (
-                           <span className="text-rose-500 flex items-center gap-1 truncate">
-                             <AlertCircle className="w-3 h-3" />
-                             {t.overspent}: {formatCurrency(Math.abs(remaining))}
-                           </span>
-                         )
-                       ) : (
-                         <span className="text-slate-300 dark:text-slate-700">Not set</span>
-                       )}
-                       <span className="text-slate-400 dark:text-slate-500 ml-2">{Math.round(percent)}%</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-          
           <div className="mt-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden transition-colors">
             <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -301,21 +182,21 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             
             <div className="overflow-x-auto">
-              <table className="w-full text-left min-w-[800px]">
+              <table className="w-full text-left min-w-[900px]">
                 <thead>
                   <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-100 dark:border-slate-800">
                     <th className="px-6 py-4">{t.date}</th>
-                    <th className="px-6 py-4">{t.month}</th>
+                    <th className="px-6 py-4">{t.broughtForward}</th>
                     <th className="px-6 py-4">{t.dailyCash}</th>
                     <th className="px-6 py-4">{t.totalExpenses}</th>
                     <th className="px-6 py-4 bg-indigo-50/30 dark:bg-indigo-900/10 text-indigo-700 dark:text-indigo-400">{t.totalBalance}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {transactions.slice().reverse().slice(0, 5).map((tx) => (
+                  {recentTransactions.map((tx) => (
                     <tr key={tx.id || tx.timestamp} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
                       <td className="px-6 py-4 text-sm font-semibold text-slate-700 dark:text-slate-300">{tx.date.split('-').reverse().join('/')}</td>
-                      <td className="px-6 py-4 text-xs font-medium text-slate-400 dark:text-slate-500">{tx.month}</td>
+                      <td className="px-6 py-4 text-xs font-medium text-slate-400 dark:text-slate-500">{formatCurrency(Number(tx.broughtForward))}</td>
                       <td className="px-6 py-4 text-sm font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(Number(tx.dailyCash))}</td>
                       <td className="px-6 py-4 text-sm font-bold text-rose-500 dark:text-rose-400">{formatCurrency(Number(tx.totalExpenses))}</td>
                       <td className="px-6 py-4 text-sm font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50/20 dark:bg-indigo-900/5">{formatCurrency(Number(tx.totalBalance))}</td>
@@ -350,12 +231,12 @@ const Dashboard: React.FC<DashboardProps> = ({
       )}
 
       {activeTab === 'budget' && (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
           <BudgetPerformance 
             t={t} 
             transactions={transactions} 
             budgets={budgets} 
-            formatCurrency={formatCurrency}
+            formatCurrency={formatCurrency} 
           />
         </div>
       )}
@@ -363,11 +244,14 @@ const Dashboard: React.FC<DashboardProps> = ({
       {activeTab === 'history' && (
         <div className="bg-white dark:bg-slate-900 rounded-3xl shadow-sm border border-slate-100 dark:border-slate-800 overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500 transition-colors">
           <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between no-print">
-            <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t.history} ({selectedMonth})</h2>
+            <div className="flex items-center gap-3">
+               <History className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />
+               <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{t.history} ({selectedMonth})</h2>
+            </div>
           </div>
           <HistoryTable 
             t={t} 
-            transactions={transactions.filter(tx => tx.month?.trim() === selectedMonth)} 
+            transactions={currentMonthTransactions} 
             allTransactions={transactions}
             onEdit={handleEdit} 
             onDelete={onDelete} 
@@ -380,7 +264,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       {showAddForm && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 dark:bg-black/70 backdrop-blur-sm no-print">
           <div className="bg-white dark:bg-slate-900 w-full max-w-2xl rounded-3xl shadow-2xl dark:shadow-none overflow-hidden max-h-[90vh] flex flex-col scale-in-center transition-colors">
-            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
               <h3 className="text-xl font-bold text-slate-800 dark:text-slate-100">
                 {editingTransaction ? t.edit : t.addRecord}
               </h3>
@@ -395,6 +279,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               <TransactionForm 
                 t={t} 
                 initialData={editingTransaction}
+                latestBalance={latestBalance}
                 formatCurrency={formatCurrency}
                 onSubmit={(data) => {
                   if (editingTransaction?.id) {

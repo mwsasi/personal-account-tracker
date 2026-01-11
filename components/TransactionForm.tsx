@@ -1,15 +1,17 @@
 
 import React, { useState, useEffect } from 'react';
 import { Transaction } from '../types';
+import { AlertCircle } from 'lucide-react';
 
 interface TransactionFormProps {
   t: any;
   initialData?: Transaction | null;
+  latestBalance?: number;
   onSubmit: (data: Transaction) => void;
   formatCurrency: (amount: number) => string;
 }
 
-const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSubmit, formatCurrency }) => {
+const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, latestBalance = 0, onSubmit, formatCurrency }) => {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     groceries: '' as any,
@@ -24,6 +26,8 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
     dailyCash: '' as any,
     broughtForward: '' as any,
   });
+
+  const [dateError, setDateError] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialData) {
@@ -41,11 +45,37 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
         dailyCash: initialData.dailyCash || '',
         broughtForward: initialData.broughtForward || '',
       });
+    } else {
+      // If adding a new record, automatically use the latestBalance as Brought Forward
+      setFormData(prev => ({
+        ...prev,
+        broughtForward: latestBalance === 0 ? '' : latestBalance
+      }));
     }
-  }, [initialData]);
+  }, [initialData, latestBalance]);
+
+  const validateDate = (dateString: string) => {
+    const selectedDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    selectedDate.setHours(0, 0, 0, 0);
+
+    if (selectedDate > today) {
+      setDateError(t.futureDateError);
+      return false;
+    } else {
+      setDateError(null);
+      return true;
+    }
+  };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value, type } = e.target;
+    
+    if (name === 'date') {
+      validateDate(value);
+    }
+
     setFormData(prev => ({
       ...prev,
       [name]: type === 'number' ? (value === '' ? '' : parseFloat(value)) : value
@@ -68,11 +98,13 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
     val(formData.travel) +
     val(formData.others);
 
-  // Requirement: Net Balance = Brought Forward + Cash Received - Total Expenses
+  // Net Balance = Brought Forward + Cash Received - Total Expenses
   const totalBalance = val(formData.broughtForward) + val(formData.dailyCash) - totalExpenses;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!validateDate(formData.date)) return;
+
     const dateObj = new Date(formData.date);
     const monthName = dateObj.toLocaleString('en-US', { month: 'long', year: 'numeric' });
 
@@ -99,16 +131,22 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <div>
+        <div className="space-y-1">
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.date}</label>
           <input
             type="date"
             name="date"
             required
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+            className={`w-full px-4 py-2.5 rounded-xl border ${dateError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all`}
             value={formData.date}
             onChange={handleChange}
           />
+          {dateError && (
+            <div className="flex items-center gap-1.5 text-rose-500 text-xs font-bold animate-in fade-in slide-in-from-top-1">
+              <AlertCircle className="w-3.5 h-3.5" />
+              {dateError}
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">{t.broughtForward}</label>
@@ -116,7 +154,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
             type="number"
             name="broughtForward"
             placeholder="0"
-            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+            className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-indigo-600 dark:text-indigo-400"
             value={formData.broughtForward}
             onChange={handleChange}
           />
@@ -125,12 +163,12 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div>
-          <label className="block text-sm font-semibold mb-1 text-indigo-700 dark:text-indigo-400">{t.dailyCash}</label>
+          <label className="block text-sm font-semibold mb-1 text-emerald-600 dark:text-emerald-400">{t.dailyCash}</label>
           <input
             type="number"
             name="dailyCash"
             placeholder="0"
-            className="w-full px-4 py-2.5 rounded-xl border border-indigo-200 dark:border-indigo-900 bg-indigo-50 dark:bg-indigo-900/10 font-bold transition-all focus:ring-2 focus:ring-indigo-500 outline-none text-slate-800 dark:text-slate-100"
+            className="w-full px-4 py-2.5 rounded-xl border border-emerald-200 dark:border-emerald-900 bg-emerald-50 dark:bg-emerald-900/10 font-bold transition-all focus:ring-2 focus:ring-emerald-500 outline-none text-emerald-800 dark:text-emerald-100"
             value={formData.dailyCash}
             onChange={handleChange}
           />
@@ -167,13 +205,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, onSub
         </div>
         <div className="text-center">
           <p className="text-xs text-slate-400 dark:text-slate-500 uppercase tracking-wider font-bold">{t.totalBalance}</p>
-          <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400">{formatCurrency(totalBalance)}</p>
+          <p className="text-2xl font-black text-indigo-600 dark:text-indigo-400">{formatCurrency(totalBalance)}</p>
         </div>
       </div>
 
       <button
         type="submit"
-        className="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 active:scale-[0.99] transition-all"
+        disabled={!!dateError}
+        className={`w-full ${dateError ? 'bg-slate-300 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 shadow-indigo-200'} text-white py-4 rounded-xl font-bold shadow-lg dark:shadow-none active:scale-[0.99] transition-all`}
       >
         {t.save}
       </button>

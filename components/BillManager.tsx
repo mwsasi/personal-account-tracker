@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { Bill, Transaction } from '../types';
 import { storageService } from '../services/googleSheets';
-import { Plus, CreditCard, Trash2, Calendar, DollarSign, X, TrendingUp, ReceiptText } from 'lucide-react';
+import { Plus, CreditCard, Trash2, Calendar, DollarSign, X, TrendingUp, ReceiptText, CheckCircle2 } from 'lucide-react';
 
 interface BillManagerProps {
   t: any;
@@ -105,6 +105,16 @@ const BillManager: React.FC<BillManagerProps> = ({ t, formatCurrency, transactio
     }
   };
 
+  const handlePayBill = async (bill: Bill) => {
+    const updatedBill: Bill = {
+      ...bill,
+      lastPaidMonth: currentMonthLabel
+    };
+    await storageService.saveBill(updatedBill);
+    setBills(prev => prev.map(b => b.id === bill.id ? updatedBill : b));
+    if (onRefresh) onRefresh();
+  };
+
   // Helper to format the current month's "due date" for the date picker input
   const getDummyDateString = (day: number = 1) => {
     const now = new Date();
@@ -185,40 +195,63 @@ const BillManager: React.FC<BillManagerProps> = ({ t, formatCurrency, transactio
           Scheduled & Recurring
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {bills.map(bill => (
-            <div key={bill.id} className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm relative group overflow-hidden transition-colors">
-              <div className="absolute top-0 left-0 w-2 h-full bg-indigo-500 opacity-20 group-hover:opacity-100 transition-all" />
-              <div className="flex justify-between items-start mb-4 pl-2">
-                <div>
-                  <h3 className="font-black text-slate-800 dark:text-slate-100 text-lg uppercase tracking-tight">{bill.name}</h3>
-                  <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t[bill.category as keyof typeof t] || bill.category}</p>
+          {bills.map(bill => {
+            const isPaidThisMonth = bill.lastPaidMonth === currentMonthLabel;
+            return (
+              <div 
+                key={bill.id} 
+                className={`bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm relative group overflow-hidden transition-all duration-300 ${isPaidThisMonth ? 'opacity-60 bg-slate-50 dark:bg-slate-800/20' : ''}`}
+              >
+                <div className={`absolute top-0 left-0 w-2 h-full transition-all ${isPaidThisMonth ? 'bg-emerald-500' : 'bg-indigo-500 opacity-20 group-hover:opacity-100'}`} />
+                <div className="flex justify-between items-start mb-4 pl-2">
+                  <div>
+                    <h3 className={`font-black text-slate-800 dark:text-slate-100 text-lg uppercase tracking-tight ${isPaidThisMonth ? 'line-through decoration-slate-400' : ''}`}>{bill.name}</h3>
+                    <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{t[bill.category as keyof typeof t] || bill.category}</p>
+                  </div>
+                  <button 
+                    onClick={() => handleDelete(bill.id)}
+                    className="p-2 text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-all"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
-                <button 
-                  onClick={() => handleDelete(bill.id)}
-                  className="p-2 text-slate-300 dark:text-slate-600 hover:text-rose-500 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/30 rounded-xl transition-all"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-              
-              <div className="flex items-center gap-6 pl-2">
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t.date}</span>
-                  <div className="flex items-center gap-2 text-indigo-600 dark:text-indigo-400 font-black">
-                    <Calendar className="w-4 h-4" />
-                    <span>Day {bill.dueDay} / Month</span>
+                
+                <div className="flex items-center gap-6 pl-2 mb-6">
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t.date}</span>
+                    <div className={`flex items-center gap-2 font-black ${isPaidThisMonth ? 'text-slate-400' : 'text-indigo-600 dark:text-indigo-400'}`}>
+                      <Calendar className="w-4 h-4" />
+                      <span>Day {bill.dueDay} / Month</span>
+                    </div>
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Amount</span>
+                    <div className={`flex items-center gap-2 font-black ${isPaidThisMonth ? 'text-slate-400' : 'text-slate-800 dark:text-slate-100'}`}>
+                      <DollarSign className="w-4 h-4 text-slate-300 dark:text-slate-700" />
+                      <span>{formatCurrency(bill.amount)}</span>
+                    </div>
                   </div>
                 </div>
-                <div className="flex flex-col">
-                  <span className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">Amount</span>
-                  <div className="flex items-center gap-2 text-slate-800 dark:text-slate-100 font-black">
-                    <DollarSign className="w-4 h-4 text-slate-300 dark:text-slate-700" />
-                    <span>{formatCurrency(bill.amount)}</span>
-                  </div>
+
+                <div className="pl-2">
+                  {isPaidThisMonth ? (
+                    <div className="flex items-center gap-2 text-emerald-600 dark:text-emerald-400 font-black text-sm uppercase tracking-widest bg-emerald-50 dark:bg-emerald-950/30 py-2 px-4 rounded-xl w-fit">
+                      <CheckCircle2 className="w-4 h-4" />
+                      {t.paid}
+                    </div>
+                  ) : (
+                    <button 
+                      onClick={() => handlePayBill(bill)}
+                      className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs uppercase tracking-widest py-3 rounded-xl transition-all shadow-md active:scale-95"
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      {t.payBill}
+                    </button>
+                  )}
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
 
           {bills.length === 0 && (
             <div className="col-span-full py-20 bg-slate-50/50 dark:bg-slate-900/50 rounded-3xl border-2 border-dashed border-slate-200 dark:border-slate-800 flex flex-col items-center justify-center text-slate-400 dark:text-slate-600 gap-4 transition-colors">

@@ -1,6 +1,9 @@
 
 
 
+
+
+
 import React, { useMemo } from 'react';
 import { Transaction, MonthlyBudget } from '../types';
 import { 
@@ -27,10 +30,10 @@ const BudgetPerformance: React.FC<BudgetPerformanceProps> = ({ t, transactions, 
       const monthTxs = transactions.filter(tx => tx.month.trim() === month);
       const monthBudget = budgets.find(b => b.month.trim() === month);
 
-      // Fix: Explicitly type 'sum' as number to resolve 'unknown' type errors during accumulation
-      const actual: number = monthTxs.reduce((sum: number, tx) => sum + (Number(tx.totalExpenses) || 0), 0);
-      // Fix: Explicitly type 'sum' as number to resolve 'unknown' type errors during accumulation
-      const budget: number = monthBudget ? Object.values(monthBudget.limits).reduce((sum: number, limit) => sum + (Number(limit) || 0), 0) : 0;
+      // Fix: Removed explicit generic type <number> from reduce to avoid "Untyped function calls" error.
+      const actual = monthTxs.reduce((sum, tx) => sum + (Number(tx.totalExpenses) || 0), 0);
+      // Fix: Removed explicit generic type <number> from reduce to avoid "Untyped function calls" error.
+      const budget = monthBudget ? (Object.values(monthBudget.limits) as number[]).reduce((sum, limit) => sum + (Number(limit) || 0), 0) : 0;
 
       return {
         month,
