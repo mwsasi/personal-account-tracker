@@ -15,6 +15,14 @@ interface StatsOverviewProps {
 const StatsOverview: React.FC<StatsOverviewProps> = ({ t, stats, formatCurrency }) => {
   const isNegative = stats.lastBalance < 0;
 
+  // Helper to format number with 2 decimals and thousands separators without the symbol
+  const formatNumberOnly = (num: number) => {
+    return Math.abs(num).toLocaleString(undefined, {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2
+    });
+  };
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
       {/* Total Spent Card */}
@@ -25,7 +33,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ t, stats, formatCurrency 
         <div className="min-w-0 flex-1">
           <p className="text-[10px] md:text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t.totalSpent}</p>
           <p className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 whitespace-nowrap overflow-visible leading-tight">
-            {formatCurrency(stats.totalSpent)}
+            {formatNumberOnly(stats.totalSpent)}
           </p>
         </div>
       </div>
@@ -38,7 +46,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ t, stats, formatCurrency 
         <div className="min-w-0 flex-1">
           <p className="text-[10px] md:text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-1">{t.totalReceived}</p>
           <p className="text-base md:text-lg font-black text-slate-800 dark:text-slate-100 whitespace-nowrap overflow-visible leading-tight">
-            {formatCurrency(stats.totalReceived)}
+            {formatNumberOnly(stats.totalReceived)}
           </p>
         </div>
       </div>
@@ -58,7 +66,7 @@ const StatsOverview: React.FC<StatsOverviewProps> = ({ t, stats, formatCurrency 
             {isNegative ? <TrendingDown className="w-3 h-3 text-white/60" /> : <TrendingUp className="w-3 h-3 text-white/60" />}
           </div>
           <p className="text-base md:text-lg font-black whitespace-nowrap overflow-visible leading-tight">
-            {formatCurrency(stats.lastBalance)}
+            {isNegative ? '-' : ''}{formatNumberOnly(stats.lastBalance)}
           </p>
         </div>
       </div>

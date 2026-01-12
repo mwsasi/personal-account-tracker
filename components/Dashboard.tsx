@@ -11,7 +11,8 @@ import {
   Plus, X, Calendar, BarChart3, ClipboardList, ArrowRight, Target, 
   AlertCircle, Clock, History, BellRing, TriangleAlert, Zap, 
   CheckCircle2, ArrowRightCircle, ShoppingBag, Leaf, Fish, 
-  Drumstick, Home, Droplets, Car, PlusCircle, LayoutGrid
+  Drumstick, Home, Droplets, Car, PlusCircle, LayoutGrid, CalendarDays,
+  ChevronDown
 } from 'lucide-react';
 import { storageService } from '../services/googleSheets';
 
@@ -29,6 +30,11 @@ interface DashboardProps {
   notifications?: Notification[];
   getStartingBalance: (date: string) => number;
 }
+
+const MONTH_NAMES = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
 
 const Dashboard: React.FC<DashboardProps> = ({ 
   activeTab, 
@@ -49,6 +55,10 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
   const [budgets, setBudgets] = useState<MonthlyBudget[]>([]);
 
+  const now = new Date();
+  const [selectedYear, setSelectedYear] = useState<number>(now.getFullYear());
+  const [selectedMonthName, setSelectedMonthName] = useState<string>(now.toLocaleString('en-US', { month: 'long' }));
+
   useEffect(() => {
     const loadBudgets = async () => {
       const data = await storageService.fetchBudgets();
@@ -57,19 +67,16 @@ const Dashboard: React.FC<DashboardProps> = ({
     loadBudgets();
   }, [transactions]);
 
-  const currentMonthName = useMemo(() => {
-    return new Date().toLocaleString('en-US', { month: 'long', year: 'numeric' });
-  }, []);
-
-  const availableMonths = useMemo(() => {
-    const monthsSet = new Set<string>();
+  const availableYears = useMemo(() => {
     const years = new Set<number>();
-    
-    // Always include the current year
     const currentYear = new Date().getFullYear();
-    years.add(currentYear);
     
-    // Extract years from transactions
+    // Always provide a range around the current year to ensure dropdown isn't "empty" or "disabled"
+    for (let i = currentYear - 5; i <= currentYear + 2; i++) {
+      years.add(i);
+    }
+
+    // Add any years found in historical data
     transactions.forEach(tx => {
       const d = new Date(tx.date);
       if (!isNaN(d.getTime())) {
@@ -77,47 +84,24 @@ const Dashboard: React.FC<DashboardProps> = ({
       }
     });
 
-    const monthNames = [
-      "January", "February", "March", "April", "May", "June",
-      "July", "August", "September", "October", "November", "December"
-    ];
-
-    // Generate all months for all involved years
-    years.forEach(year => {
-      monthNames.forEach(month => {
-        monthsSet.add(`${month} ${year}`);
-      });
-    });
-
-    // Sort descending chronologically
-    return Array.from(monthsSet).sort((a, b) => {
-      return new Date(b).getTime() - new Date(a).getTime();
-    });
+    return Array.from(years).sort((a, b) => b - a);
   }, [transactions]);
 
-  const [selectedMonth, setSelectedMonth] = useState<string>(currentMonthName);
-
-  // Sync selectedMonth if currentMonthName changes or component mounts
-  useEffect(() => {
-    if (!selectedMonth) {
-      setSelectedMonth(currentMonthName);
-    }
-  }, [currentMonthName, selectedMonth]);
+  const selectedMonthKey = `${selectedMonthName} ${selectedYear}`;
 
   const activeBudget = useMemo(() => {
-    return budgets.find(b => b.month === selectedMonth) || {
-      month: selectedMonth,
+    return budgets.find(b => b.month === selectedMonthKey) || {
+      month: selectedMonthKey,
       limits: { groceries: 0, vegetables: 0, fishEgg: 0, chicken: 0, houseRent: 0, electricity: 0, water: 0, travel: 0, others: 0 }
     };
-  }, [budgets, selectedMonth]);
+  }, [budgets, selectedMonthKey]);
 
   const currentMonthTransactions = useMemo(() => {
     return transactions
-      .filter(tx => tx.month?.trim() === selectedMonth)
+      .filter(tx => tx.month?.trim() === selectedMonthKey)
       .sort((a, b) => a.date.localeCompare(b.date) || a.timestamp.localeCompare(b.timestamp));
-  }, [transactions, selectedMonth]);
+  }, [transactions, selectedMonthKey]);
 
-  // Category Totals for Quick-View
   const categorySummary = useMemo(() => {
     const categories = [
       { key: 'groceries', label: t.groceries, icon: ShoppingBag, color: 'text-indigo-500', bg: 'bg-indigo-50 dark:bg-indigo-900/20' },
@@ -138,7 +122,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [currentMonthTransactions, activeBudget, t]);
 
-  // Real-time Budget Health Calculation
   const budgetHealth = useMemo(() => {
     const issues = categorySummary
       .filter(cat => cat.limit > 0 && (cat.total / cat.limit) * 100 >= 80)
@@ -171,23 +154,13 @@ const Dashboard: React.FC<DashboardProps> = ({
       .slice(0, 5);
   }, [transactions]);
 
-  const activeAlerts = useMemo(() => {
-    return notifications
-      .filter(n => (n.type === 'bill' || n.type === 'budget') && !n.read)
-      .sort((a, b) => {
-        const priorityMap = { high: 0, medium: 1, low: 2 };
-        return (priorityMap[a.priority] || 3) - (priorityMap[b.priority] || 3);
-      })
-      .slice(0, 3);
-  }, [notifications]);
-
   const handleEdit = (tx: Transaction) => {
     setEditingTransaction(tx);
     setShowAddForm(true);
   };
 
   const handleSaveBudget = async (limits: MonthlyBudget['limits']) => {
-    await storageService.saveBudget(selectedMonth, limits);
+    await storageService.saveBudget(selectedMonthKey, limits);
     const updated = await storageService.fetchBudgets();
     setBudgets(updated);
     setShowBudgetForm(false);
@@ -195,36 +168,68 @@ const Dashboard: React.FC<DashboardProps> = ({
 
   return (
     <div className="space-y-4 md:space-y-6">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white dark:bg-slate-900 p-3 md:p-4 rounded-2xl md:rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm no-print transition-colors">
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg">
-            <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
-          </div>
-          <div className="flex-grow min-w-0">
-            <h2 className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-0.5 truncate">{t.selectMonth}</h2>
-            <select 
-              value={selectedMonth}
-              onChange={(e) => setSelectedMonth(e.target.value)}
-              className="bg-transparent font-bold text-base text-slate-800 dark:text-slate-100 outline-none cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors w-full appearance-none"
-            >
-              {availableMonths.map(m => (
-                <option key={m} value={m} className="bg-white dark:bg-slate-900 text-sm">{m}</option>
-              ))}
-            </select>
-          </div>
+      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm no-print transition-colors">
+        <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
+          {/* Year Dropdown */}
+          <label 
+            htmlFor="year-selector" 
+            className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-2xl min-w-[140px] flex-1 sm:flex-none cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50 group"
+          >
+            <div className="p-2 bg-white dark:bg-slate-700 rounded-xl shadow-sm group-hover:scale-110 group-hover:text-indigo-600 transition-all">
+              <CalendarDays className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="flex-grow min-w-0 pr-6 relative">
+              <h2 className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mb-1">{t.selectYear}</h2>
+              <select 
+                id="year-selector"
+                value={selectedYear}
+                onChange={(e) => setSelectedYear(Number(e.target.value))}
+                className="bg-transparent font-black text-sm text-slate-900 dark:text-slate-100 outline-none cursor-pointer w-full appearance-none"
+              >
+                {availableYears.map(y => (
+                  <option key={y} value={y} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">{y}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 dark:text-indigo-400 pointer-events-none group-hover:translate-y-[-40%] transition-transform" />
+            </div>
+          </label>
+
+          {/* Month Dropdown */}
+          <label 
+            htmlFor="month-selector"
+            className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-2xl min-w-[160px] flex-1 sm:flex-none cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50 group"
+          >
+            <div className="p-2 bg-white dark:bg-slate-700 rounded-xl shadow-sm group-hover:scale-110 group-hover:text-indigo-600 transition-all">
+              <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <div className="flex-grow min-w-0 pr-6 relative">
+              <h2 className="text-[9px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none mb-1">{t.selectMonth}</h2>
+              <select 
+                id="month-selector"
+                value={selectedMonthName}
+                onChange={(e) => setSelectedMonthName(e.target.value)}
+                className="bg-transparent font-black text-sm text-slate-900 dark:text-slate-100 outline-none cursor-pointer w-full appearance-none"
+              >
+                {MONTH_NAMES.map(m => (
+                  <option key={m} value={m} className="bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100">{m}</option>
+                ))}
+              </select>
+              <ChevronDown className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 text-indigo-500 dark:text-indigo-400 pointer-events-none group-hover:translate-y-[-40%] transition-transform" />
+            </div>
+          </label>
         </div>
         
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-3 w-full lg:w-auto">
           <button 
             onClick={() => setShowBudgetForm(true)}
-            className="flex-1 sm:flex-none flex items-center justify-center gap-2 px-3 py-2.5 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 rounded-xl font-bold text-xs hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-indigo-100 dark:border-indigo-900 shadow-sm active:scale-95"
+            className="flex-1 lg:flex-none flex items-center justify-center gap-2 px-5 py-3 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 rounded-2xl font-bold text-xs hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-indigo-100 dark:border-indigo-900 shadow-sm active:scale-95"
           >
             <Target className="w-4 h-4" />
             <span>{t.manageBudget}</span>
           </button>
           <button 
             onClick={() => setShowAddForm(true)}
-            className="flex-1 sm:flex-none bg-indigo-600 text-white px-4 py-2.5 rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 active:scale-95 transition-all"
+            className="flex-1 lg:flex-none bg-indigo-600 text-white px-6 py-3 rounded-2xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 active:scale-95 transition-all"
           >
             <Plus className="w-4 h-4" />
             <span>{t.addRecord}</span>
@@ -449,7 +454,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="p-3 md:p-6 overflow-y-auto">
               <BudgetManager 
                 t={t} 
-                month={selectedMonth} 
+                month={selectedMonthKey} 
                 initialLimits={activeBudget.limits} 
                 onSubmit={handleSaveBudget} 
               />
