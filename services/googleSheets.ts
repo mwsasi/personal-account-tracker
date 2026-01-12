@@ -30,6 +30,11 @@ export const storageService = {
     return false;
   },
 
+  async saveAllTransactions(transactions: Transaction[]): Promise<boolean> {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(transactions));
+    return true;
+  },
+
   async deleteTransaction(id: string): Promise<boolean> {
     const data = await this.fetchTransactions();
     const filtered = data.filter(tx => tx.id !== id);

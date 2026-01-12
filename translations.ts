@@ -79,7 +79,9 @@ export const translations = {
     applyFilters: "Apply Filters",
     futureDateError: "Future dates are not allowed",
     payBill: "Pay Bill",
-    paid: "Paid"
+    paid: "Paid",
+    processing: "Processing...",
+    sinhalaEntry: "Sinhala Input"
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -160,6 +162,8 @@ export const translations = {
     applyFilters: "පෙරහන් යොදන්න",
     futureDateError: "අනාගත දින ඇතුළත් කළ නොහැක",
     payBill: "ගෙවීම සිදු කරන්න",
-    paid: "ගෙවා ඇත"
+    paid: "ගෙවා ඇත",
+    processing: "සකසමින් පවතී...",
+    sinhalaEntry: "සිංහල ආදානය"
   }
 };

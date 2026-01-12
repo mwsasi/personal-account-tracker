@@ -13,7 +13,8 @@
     "recharts": "^3.6.0",
     "lucide-react": "^0.562.0",
     "react-dom": "^19.2.3",
-    "xlsx": "0.18.5"
+    "xlsx": "0.18.5",
+    "@google/genai": "^1.35.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
