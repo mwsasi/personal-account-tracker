@@ -277,11 +277,11 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
               {categorySummary.map((cat) => (
-                <div key={cat.key} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-2.5 transition-all hover:shadow-md group">
+                <div key={cat.key} className="bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm flex items-center gap-2.5 transition-all hover:shadow-md group min-w-0">
                   <div className={`p-1.5 rounded-lg transition-colors ${cat.bg} shrink-0`}>
                     <cat.icon className={`w-4 h-4 ${cat.color}`} />
                   </div>
-                  <div className="min-w-0 flex-grow">
+                  <div className="min-w-0 flex-1">
                     <p className="text-[8px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest truncate mb-0.5">{cat.label}</p>
                     <div className="flex flex-col">
                       <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">{formatCurrency(cat.total)}</p>
@@ -292,7 +292,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                       )}
                     </div>
                     {cat.limit > 0 && (
-                      <div className="mt-1.5 w-full h-0.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="mt-1.5 w-full h-0.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden shrink-0">
                         <div 
                           className={`h-full transition-all duration-700 ${(cat.total / cat.limit) >= 1 ? 'bg-rose-500' : 'bg-indigo-500'}`}
                           style={{ width: `${Math.min((cat.total / cat.limit) * 100, 100)}%` }}

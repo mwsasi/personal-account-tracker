@@ -17,9 +17,10 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
-  const [currencySettings, setCurrencySettings] = useState<CurrencySettings>({
-    symbol: 'LKR',
-    position: 'before'
+  const [currencySettings, setCurrencySettings] = useState<CurrencySettings>(() => {
+    const saved = localStorage.getItem('currency_settings');
+    // Default symbol changed from LKR to Rs
+    return saved ? JSON.parse(saved) : { symbol: 'Rs', position: 'before' };
   });
 
   const t = translations[lang];
@@ -39,20 +40,18 @@ const App: React.FC = () => {
   }, [isDark]);
 
   const formatCurrency = useCallback((amount: number) => {
-    const formattedAmount = amount.toLocaleString();
+    const formattedAmount = amount.toLocaleString(undefined, { 
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    });
     return currencySettings.position === 'before' 
       ? `${currencySettings.symbol} ${formattedAmount}`
       : `${formattedAmount} ${currencySettings.symbol}`;
   }, [currencySettings]);
 
-  /**
-   * Recalculates the entire transaction history to ensure balance continuity.
-   * Every record's BF is strictly derived from the previous record's total balance.
-   */
   const recalculateChain = useCallback((txs: Transaction[]) => {
     if (txs.length === 0) return [];
     
-    // Sort strictly by date, then by timestamp
     const sorted = [...txs].sort((a, b) => {
       const dateDiff = a.date.localeCompare(b.date);
       if (dateDiff !== 0) return dateDiff;
@@ -63,14 +62,10 @@ const App: React.FC = () => {
 
     let runningBalance = 0;
     return sorted.map((tx, index) => {
-      // For the very first entry, we use its own BF if it exists, otherwise 0.
-      // For all subsequent entries, the BF is the closing balance (runningBalance) of the previous entry.
       const bf = index === 0 ? Number(tx.broughtForward || 0) : runningBalance;
-      
       const income = Number(tx.dailyCash || 0);
       const expense = categories.reduce((sum, cat) => sum + (Number((tx as any)[cat]) || 0), 0);
       const totalBalance = bf + income - expense;
-      
       runningBalance = totalBalance;
       
       return {
@@ -82,9 +77,6 @@ const App: React.FC = () => {
     });
   }, []);
 
-  /**
-   * Finds the closing balance of the last recorded date BEFORE the target date.
-   */
   const getStartingBalance = useCallback((targetDate: string) => {
     if (!transactions || transactions.length === 0) return 0;
     
@@ -94,15 +86,9 @@ const App: React.FC = () => {
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    // Find the absolute latest transaction that occurred before the targetDate
     const lastValidEntry = [...sorted].reverse().find(tx => tx.date < targetDate);
+    if (lastValidEntry) return Number(lastValidEntry.totalBalance || 0);
     
-    if (lastValidEntry) {
-      return Number(lastValidEntry.totalBalance || 0);
-    }
-    
-    // If no entries exist before this date, and an entry already exists on this date,
-    // we return its Brought Forward value to keep consistency.
     const sameDayEntry = sorted.find(tx => tx.date === targetDate);
     if (sameDayEntry) return Number(sameDayEntry.broughtForward || 0);
     
@@ -173,9 +159,6 @@ const App: React.FC = () => {
       const rebalanced = recalculateChain(data);
       setTransactions(rebalanced);
       await generateNotifications(rebalanced);
-      
-      const savedCurrency = localStorage.getItem('currency_settings');
-      if (savedCurrency) setCurrencySettings(JSON.parse(savedCurrency));
     } catch (err) {
       console.error("Failed to load data", err);
     } finally {
@@ -185,33 +168,26 @@ const App: React.FC = () => {
 
   const onAddTransaction = useCallback(async (data: Transaction) => {
     const freshTransactions = await storageService.fetchTransactions();
-    // Search for an existing entry for this specific date
     const existingIndex = freshTransactions.findIndex(tx => tx.date === data.date);
     
     let newList;
     if (existingIndex !== -1) {
       const existing = freshTransactions[existingIndex];
       const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
-      
-      // When merging, we sum everything but keep the original BF to preserve chain integrity
       const merged: Transaction = {
         ...existing,
         dailyCash: Number(existing.dailyCash || 0) + Number(data.dailyCash || 0),
-        timestamp: new Date().toISOString() // Update timestamp to reflect newest activity
+        timestamp: new Date().toISOString()
       };
-      
       categories.forEach(cat => {
         (merged as any)[cat] = Number((existing as any)[cat] || 0) + Number((data as any)[cat] || 0);
       });
-      
       newList = [...freshTransactions];
       newList[existingIndex] = merged;
     } else {
-      // New date - create fresh entry
       newList = [...freshTransactions, { ...data, id: crypto.randomUUID(), timestamp: new Date().toISOString() }];
     }
     
-    // Always rebalance the entire chain before saving to ensure any insertion or update propagates correctly
     const rebalanced = recalculateChain(newList);
     await storageService.saveAllTransactions(rebalanced);
     loadData();

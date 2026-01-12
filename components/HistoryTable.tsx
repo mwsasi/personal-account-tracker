@@ -1,5 +1,5 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import { Transaction, MonthlyBudget } from '../types';
 import { Edit2, Trash2, FileSpreadsheet, Printer, Search, X, Calendar as CalendarIcon, Filter, PieChart, AlertCircle, TrendingDown } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -19,20 +19,36 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
   const [stagedSearch, setStagedSearch] = useState('');
   const [stagedStart, setStagedStart] = useState('');
   const [stagedEnd, setStagedEnd] = useState('');
+  
   const [activeSearch, setActiveSearch] = useState('');
   const [activeStart, setActiveStart] = useState('');
   const [activeEnd, setActiveEnd] = useState('');
 
+  // Explicitly apply filters to force state update and re-memoization
+  const handleApplyFilters = useCallback((e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setActiveSearch(stagedSearch);
+    setActiveStart(stagedStart);
+    setActiveEnd(stagedEnd);
+  }, [stagedSearch, stagedStart, stagedEnd]);
+
+  const hasPendingFilters = stagedSearch !== activeSearch || stagedStart !== activeStart || stagedEnd !== activeEnd;
+
   const filteredTransactions = useMemo(() => {
     const lowerSearch = activeSearch.toLowerCase().trim();
-    // If any filter is active, we search the entire database (allTransactions).
-    // Otherwise, we show the month-filtered transactions passed as the main prop.
+    
+    // Switch to allTransactions if any filter is active
     const source = (activeSearch || activeStart || activeEnd) ? allTransactions : transactions;
     
     return source.filter(tx => {
+      // Date range filtering
       if (activeStart && tx.date < activeStart) return false;
       if (activeEnd && tx.date > activeEnd) return false;
       
+      // Text search filtering
       if (lowerSearch) {
         const formattedDate = tx.date.split('-').reverse().join('/');
         const dateMatch = tx.date.includes(lowerSearch) || formattedDate.includes(lowerSearch);
@@ -55,12 +71,17 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
         );
         if (matchesCategory) return true;
         
-        const numericMatch = 
-          tx.totalExpenses.toString().includes(lowerSearch) || 
-          tx.dailyCash.toString().includes(lowerSearch) || 
-          tx.totalBalance.toString().includes(lowerSearch);
+        // Match numbers including .00 precision
+        const totalExpStr = Number(tx.totalExpenses).toFixed(2);
+        const dailyCashStr = Number(tx.dailyCash).toFixed(2);
+        const totalBalStr = Number(tx.totalBalance).toFixed(2);
         
-        return numericMatch;
+        return totalExpStr.includes(lowerSearch) || 
+               dailyCashStr.includes(lowerSearch) || 
+               totalBalStr.includes(lowerSearch) ||
+               tx.totalExpenses.toString().includes(lowerSearch) || 
+               tx.dailyCash.toString().includes(lowerSearch) || 
+               tx.totalBalance.toString().includes(lowerSearch);
       }
       return true;
     });
@@ -78,7 +99,8 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     const totalIncome = sortedFiltered.reduce((sum, tx) => sum + (Number(tx.dailyCash) || 0), 0);
     const totalExpenses = sortedFiltered.reduce((sum, tx) => sum + (Number(tx.totalExpenses) || 0), 0);
     
-    const startBF = Number(sortedFiltered[0].broughtForward) || 0;
+    const firstTx = sortedFiltered[0];
+    const startBF = Number(firstTx.broughtForward) || 0;
     const endBalance = startBF + totalIncome - totalExpenses;
     
     const catKeys = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
@@ -119,27 +141,25 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     if (sortedFiltered.length === 0) return;
     const workbook = XLSX.utils.book_new();
     
-    // 1. Transactions Sheet
     const formattedData = sortedFiltered.map(tx => ({
       [t.date]: tx.date,
-      [t.broughtForward]: tx.broughtForward,
-      [t.dailyCash]: tx.dailyCash,
-      [t.groceries]: tx.groceries,
-      [t.vegetables]: tx.vegetables,
-      [t.fishEgg]: tx.fishEgg,
-      [t.chicken]: tx.chicken,
-      [t.houseRent]: tx.houseRent,
-      [t.electricity]: tx.electricity,
-      [t.water]: tx.water,
-      [t.travel]: tx.travel,
-      [t.others]: tx.others,
-      [t.totalExpenses]: tx.totalExpenses,
-      [t.totalBalance]: tx.totalBalance,
+      [t.broughtForward]: Number(tx.broughtForward).toFixed(2),
+      [t.dailyCash]: Number(tx.dailyCash).toFixed(2),
+      [t.groceries]: Number(tx.groceries).toFixed(2),
+      [t.vegetables]: Number(tx.vegetables).toFixed(2),
+      [t.fishEgg]: Number(tx.fishEgg).toFixed(2),
+      [t.chicken]: Number(tx.chicken).toFixed(2),
+      [t.houseRent]: Number(tx.houseRent).toFixed(2),
+      [t.electricity]: Number(tx.electricity).toFixed(2),
+      [t.water]: Number(tx.water).toFixed(2),
+      [t.travel]: Number(tx.travel).toFixed(2),
+      [t.others]: Number(tx.others).toFixed(2),
+      [t.totalExpenses]: Number(tx.totalExpenses).toFixed(2),
+      [t.totalBalance]: Number(tx.totalBalance).toFixed(2),
     }));
     const ws = XLSX.utils.json_to_sheet(formattedData);
     XLSX.utils.book_append_sheet(workbook, ws, "Transactions");
 
-    // 2. Monthly Summary Sheet (Fixed layout using Array of Arrays)
     if (summary) {
       const summaryAOA = [
         ["FINANCIAL SUMMARY REPORT"],
@@ -147,17 +167,16 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
         ["Month / Period", summary.isSingleMonth ? summary.currentMonthLabel : "Filtered Range"],
         [],
         ["SUMMARY METRICS", "AMOUNT"],
-        [t.broughtForward, summary.startBF],
-        [t.totalIncome, summary.totalIncome],
-        [t.totalExpenses, summary.totalExpenses],
-        [t.totalBalance, summary.endBalance],
+        [t.broughtForward, Number(summary.startBF).toFixed(2)],
+        [t.totalIncome, Number(summary.totalIncome).toFixed(2)],
+        [t.totalExpenses, Number(summary.totalExpenses).toFixed(2)],
+        [t.totalBalance, Number(summary.endBalance).toFixed(2)],
         [],
         ["CATEGORY BREAKDOWN", "TOTAL SPENT"],
       ];
 
-      // Fix: Cast val to any or [string, any] to avoid "Property 'actual' does not exist on type 'unknown'" error.
       Object.entries(summary.catTotals).forEach(([key, val]: [string, any]) => {
-        summaryAOA.push([(t as any)[key], val.actual]);
+        summaryAOA.push([(t as any)[key], Number(val.actual).toFixed(2)]);
       });
 
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryAOA);
@@ -170,6 +189,10 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
   const clearFilters = () => {
     setStagedSearch(''); setStagedStart(''); setStagedEnd('');
     setActiveSearch(''); setActiveStart(''); setActiveEnd('');
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleApplyFilters();
   };
 
   if (isLoading) return <div className="p-12 text-center text-slate-400">Loading records...</div>;
@@ -225,7 +248,6 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
-             {/* Fix: Explicitly type entries to avoid Property 'actual' does not exist on type 'unknown' error. */}
              {Object.entries(summary.catTotals).map(([key, value]: [string, any]) => (
                <div key={key} className="bg-white/50 dark:bg-slate-900/50 p-2 md:p-3 rounded-lg md:rounded-xl border border-slate-100/50 dark:border-slate-800/50">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{(t as any)[key]}</p>
@@ -247,45 +269,47 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
       <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-800 space-y-4 no-print transition-colors">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
           <div className="lg:col-span-4 relative group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
+            <Search className={`absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${stagedSearch !== activeSearch ? 'text-indigo-500 animate-pulse' : 'text-slate-400'}`} />
             <input 
               type="text" 
               placeholder={t.search} 
               className="w-full pl-11 pr-4 py-2.5 md:py-3 rounded-xl md:rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-medium text-sm shadow-sm" 
               value={stagedSearch} 
               onChange={(e) => setStagedSearch(e.target.value)} 
-              onKeyDown={(e) => e.key === 'Enter' && setActiveSearch(stagedSearch)} 
+              onKeyDown={handleKeyDown} 
             />
           </div>
           <div className="lg:col-span-5 flex items-center gap-2">
-            <div className="flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-700">
+            <div className={`flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border transition-colors ${stagedStart !== activeStart ? 'border-indigo-400' : 'border-slate-200 dark:border-slate-700'}`}>
               <CalendarIcon className="w-3.5 h-3.5 text-slate-300 mr-2" />
-              <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedStart} onChange={(e) => setStagedStart(e.target.value)} />
+              <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedStart} onChange={(e) => setStagedStart(e.target.value)} onKeyDown={handleKeyDown} />
             </div>
             <span className="text-slate-400 font-bold px-1">→</span>
-            <div className="flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border border-slate-200 dark:border-slate-700">
+            <div className={`flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border transition-colors ${stagedEnd !== activeEnd ? 'border-indigo-400' : 'border-slate-200 dark:border-slate-700'}`}>
               <CalendarIcon className="w-3.5 h-3.5 text-slate-300 mr-2" />
-              <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedEnd} onChange={(e) => setStagedEnd(e.target.value)} />
+              <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedEnd} onChange={(e) => setStagedEnd(e.target.value)} onKeyDown={handleKeyDown} />
             </div>
           </div>
           <div className="lg:col-span-3 flex items-end gap-2 md:gap-3 h-full">
             <button 
-              onClick={() => { setActiveSearch(stagedSearch); setActiveStart(stagedStart); setActiveEnd(stagedEnd); }} 
-              className="flex-1 flex items-center justify-center gap-2 bg-indigo-600 text-white font-bold text-xs md:text-sm hover:bg-indigo-700 py-2.5 md:py-3 rounded-xl md:rounded-2xl transition-all shadow-lg active:scale-95"
+              type="button"
+              onClick={(e) => handleApplyFilters(e)} 
+              className={`flex-1 flex items-center justify-center gap-2 font-bold text-xs md:text-sm py-2.5 md:py-3 rounded-xl md:rounded-2xl transition-all shadow-lg active:scale-95 ${hasPendingFilters ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
             >
               <Filter className="w-3.5 md:w-4 h-3.5 md:h-4" />
               {t.applyFilters}
             </button>
-            <button onClick={clearFilters} className="p-2.5 md:p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl md:rounded-2xl transition-all border border-slate-200 dark:border-slate-700">
+            <button type="button" onClick={clearFilters} className="p-2.5 md:p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl md:rounded-2xl transition-all border border-slate-200 dark:border-slate-700">
               <X className="w-4 md:w-5 h-4 md:h-5" />
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
           <div className="flex gap-2 md:gap-3">
              <button onClick={() => window.print()} className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px] md:text-xs hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-all"><Printer className="w-3 md:w-3.5 h-3 md:h-3.5" />{t.printReport}</button>
              <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 text-white font-bold text-[10px] md:text-xs hover:bg-emerald-700 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-all"><FileSpreadsheet className="w-3 md:w-3.5 h-3 md:h-3.5" />{t.exportExcel}</button>
           </div>
+          {hasPendingFilters && <p className="text-[10px] font-bold text-indigo-500 animate-pulse uppercase tracking-tighter">* Changes pending apply</p>}
         </div>
       </div>
 
@@ -317,15 +341,15 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
                 <td className="px-6 py-4 font-semibold text-slate-700 dark:text-slate-300">{tx.date.split('-').reverse().join('/')}</td>
                 <td className="px-6 py-4 font-bold text-indigo-500 dark:text-indigo-400">{formatCurrency(Number(tx.broughtForward))}</td>
                 <td className="px-6 py-4 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(Number(tx.dailyCash))}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.groceries || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.vegetables || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.fishEgg || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.chicken || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.houseRent || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.electricity || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.water || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.travel || 0).toLocaleString()}</td>
-                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{Number(tx.others || 0).toLocaleString()}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.groceries || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.vegetables || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.fishEgg || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.chicken || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.houseRent || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.electricity || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.water || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.travel || 0))}</td>
+                <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.others || 0))}</td>
                 <td className="px-6 py-4 font-bold text-rose-500 dark:text-rose-400">{formatCurrency(Number(tx.totalExpenses))}</td>
                 <td className="px-6 py-4 font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50/20 dark:bg-indigo-900/5">{formatCurrency(Number(tx.totalBalance))}</td>
                 <td className="px-6 py-4 no-print whitespace-nowrap">
