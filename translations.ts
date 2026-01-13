@@ -83,7 +83,20 @@ export const translations = {
     payBill: "Pay Bill",
     paid: "Paid",
     processing: "Processing...",
-    sinhalaEntry: "Sinhala Input"
+    sinhalaEntry: "සිංහල ආදානය",
+    login: "Login",
+    register: "Register",
+    email: "Email Address",
+    password: "Password",
+    fullName: "Full Name",
+    noAccount: "Don't have an account?",
+    hasAccount: "Already have an account?",
+    welcomeBack: "Welcome Back",
+    createAccount: "Create Account",
+    authError: "Invalid email or password",
+    logout: "Logout",
+    calculating: "Syncing balances...",
+    autoSyncEnabled: "Auto-Balance Sync Active"
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -168,6 +181,19 @@ export const translations = {
     payBill: "ගෙවීම සිදු කරන්න",
     paid: "ගෙවා ඇත",
     processing: "සකසමින් පවතී...",
-    sinhalaEntry: "සිංහල ආදානය"
+    sinhalaEntry: "සිංහල ආදානය",
+    login: "පිවිසෙන්න",
+    register: "ලියාපදිංචි වන්න",
+    email: "විද්‍යුත් තැපෑල",
+    password: "මුරපදය",
+    fullName: "සම්පූර්ණ නම",
+    noAccount: "ගිණුමක් නැද්ද?",
+    hasAccount: "දැනටමත් ගිණුමක් තිබේද?",
+    welcomeBack: "නැවත සාදරයෙන් පිළිගනිමු",
+    createAccount: "ගිණුමක් සාදන්න",
+    authError: "විද්‍යුත් තැපෑල හෝ මුරපදය වැරදියි",
+    logout: "පිටවීම",
+    calculating: "ශේෂයන් සමමුහුර්ත කරමින්...",
+    autoSyncEnabled: "ස්වයංක්‍රීය ශේෂ සමමුහුර්තකරණය ක්‍රියාත්මකයි"
   }
 };

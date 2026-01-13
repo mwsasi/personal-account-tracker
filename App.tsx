@@ -1,25 +1,30 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Transaction, Language, CurrencySettings, Notification, MonthlyBudget, Bill } from './types';
+import React, { useState, useEffect, useCallback } from 'react';
+import { Transaction, Language, CurrencySettings, Notification } from './types';
 import { translations } from './translations';
 import { storageService } from './services/googleSheets';
 import Dashboard from './components/Dashboard';
 import SettingsPage from './components/SettingsPage';
 import NotificationDrawer from './components/NotificationDrawer';
 import BillManager from './components/BillManager';
-import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon } from 'lucide-react';
+import AuthForm from './components/AuthForm';
+import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw } from 'lucide-react';
 
 const App: React.FC = () => {
+  const [user, setUser] = useState<{name: string, email: string} | null>(() => {
+    const saved = localStorage.getItem('finance_user');
+    return saved ? JSON.parse(saved) : null;
+  });
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('lang') as Language) || 'en');
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'history' | 'budget' | 'settings' | 'bills'>('dashboard');
   const [isLoading, setIsLoading] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [currencySettings, setCurrencySettings] = useState<CurrencySettings>(() => {
     const saved = localStorage.getItem('currency_settings');
-    // Default symbol changed from LKR to Rs
     return saved ? JSON.parse(saved) : { symbol: 'Rs', position: 'before' };
   });
 
@@ -39,6 +44,25 @@ const App: React.FC = () => {
     }
   }, [isDark]);
 
+  const handleLogout = () => {
+    if (window.confirm(t.logout + "?")) {
+      localStorage.removeItem('finance_user');
+      setUser(null);
+    }
+  };
+
+  const handleLogin = async (email: string, pass: string) => {
+    const dummyUser = { name: email.split('@')[0], email };
+    localStorage.setItem('finance_user', JSON.stringify(dummyUser));
+    setUser(dummyUser);
+  };
+
+  const handleRegister = async (name: string, email: string, pass: string) => {
+    const dummyUser = { name, email };
+    localStorage.setItem('finance_user', JSON.stringify(dummyUser));
+    setUser(dummyUser);
+  };
+
   const formatCurrency = useCallback((amount: number) => {
     const formattedAmount = amount.toLocaleString(undefined, { 
       minimumFractionDigits: 2, 
@@ -49,9 +73,16 @@ const App: React.FC = () => {
       : `${formattedAmount} ${currencySettings.symbol}`;
   }, [currencySettings]);
 
+  /**
+   * RECALCULATE CHAIN
+   * This is the core integrity function. It ensures that every record's "Brought Forward"
+   * is strictly the "Total Balance" of the chronologically previous record.
+   * This propagates changes across the entire history when any record is edited or inserted.
+   */
   const recalculateChain = useCallback((txs: Transaction[]) => {
     if (txs.length === 0) return [];
     
+    // Sort primarily by calendar date, then by entry timestamp
     const sorted = [...txs].sort((a, b) => {
       const dateDiff = a.date.localeCompare(b.date);
       if (dateDiff !== 0) return dateDiff;
@@ -62,10 +93,13 @@ const App: React.FC = () => {
 
     let runningBalance = 0;
     return sorted.map((tx, index) => {
+      // The absolute first entry in the database defines the starting BF.
+      // Every subsequent record is forced to follow the running balance of history.
       const bf = index === 0 ? Number(tx.broughtForward || 0) : runningBalance;
       const income = Number(tx.dailyCash || 0);
       const expense = categories.reduce((sum, cat) => sum + (Number((tx as any)[cat]) || 0), 0);
       const totalBalance = bf + income - expense;
+      
       runningBalance = totalBalance;
       
       return {
@@ -77,21 +111,32 @@ const App: React.FC = () => {
     });
   }, []);
 
+  /**
+   * GET STARTING BALANCE
+   * Used by the Transaction Form to suggest the opening balance for a specific date.
+   * It finds the closing balance (Total Balance) of the immediately preceding record in history.
+   */
   const getStartingBalance = useCallback((targetDate: string) => {
     if (!transactions || transactions.length === 0) return 0;
     
+    // Sort transactions chronologically
     const sorted = [...transactions].sort((a, b) => {
-      const d = a.date.localeCompare(b.date);
-      if (d !== 0) return d;
+      const dateDiff = a.date.localeCompare(b.date);
+      if (dateDiff !== 0) return dateDiff;
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    const lastValidEntry = [...sorted].reverse().find(tx => tx.date < targetDate);
-    if (lastValidEntry) return Number(lastValidEntry.totalBalance || 0);
-    
+    // Case 1: If a record already exists for this date, return its current BF (useful for merges)
     const sameDayEntry = sorted.find(tx => tx.date === targetDate);
     if (sameDayEntry) return Number(sameDayEntry.broughtForward || 0);
     
+    // Case 2: Find the record with the latest date BEFORE the target date
+    const lastValidEntry = [...sorted].reverse().find(tx => tx.date < targetDate);
+    
+    // Return the closing balance of that preceding day
+    if (lastValidEntry) return Number(lastValidEntry.totalBalance || 0);
+    
+    // Case 3: Earliest record or empty
     return 0;
   }, [transactions]);
 
@@ -167,17 +212,20 @@ const App: React.FC = () => {
   }, [generateNotifications, recalculateChain]);
 
   const onAddTransaction = useCallback(async (data: Transaction) => {
+    setIsSyncing(true);
+    // Fetch fresh copy to avoid race conditions with local state
     const freshTransactions = await storageService.fetchTransactions();
     const existingIndex = freshTransactions.findIndex(tx => tx.date === data.date);
     
     let newList;
     if (existingIndex !== -1) {
+      // If adding a record for a date that already exists, MERGE the amounts
       const existing = freshTransactions[existingIndex];
       const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
       const merged: Transaction = {
         ...existing,
         dailyCash: Number(existing.dailyCash || 0) + Number(data.dailyCash || 0),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString() // Update timestamp for chronological priority if same date
       };
       categories.forEach(cat => {
         (merged as any)[cat] = Number((existing as any)[cat] || 0) + Number((data as any)[cat] || 0);
@@ -185,35 +233,48 @@ const App: React.FC = () => {
       newList = [...freshTransactions];
       newList[existingIndex] = merged;
     } else {
+      // Brand new calendar date entry
       newList = [...freshTransactions, { ...data, id: crypto.randomUUID(), timestamp: new Date().toISOString() }];
     }
     
+    // CRITICAL: Re-propagate all balances across history to ensure the new data correctly shifts future records
     const rebalanced = recalculateChain(newList);
     await storageService.saveAllTransactions(rebalanced);
-    loadData();
+    await loadData();
+    setIsSyncing(false);
   }, [loadData, recalculateChain]);
 
   const onUpdateTransaction = useCallback(async (id: string, data: Transaction) => {
+    setIsSyncing(true);
     const freshTransactions = await storageService.fetchTransactions();
     const updatedList = freshTransactions.map(tx => tx.id === id ? { ...data, id } : tx);
+    // CRITICAL: Re-propagate balances in case this edit changed the closing balance of this day
     const rebalanced = recalculateChain(updatedList);
     await storageService.saveAllTransactions(rebalanced);
-    loadData();
+    await loadData();
+    setIsSyncing(false);
   }, [loadData, recalculateChain]);
 
   const onDeleteTransaction = useCallback(async (id: string) => {
     if (window.confirm(t.confirmDelete)) {
+      setIsSyncing(true);
       const freshTransactions = await storageService.fetchTransactions();
       const updatedList = freshTransactions.filter(tx => tx.id !== id);
+      // CRITICAL: Re-propagate balances because removing a day changes the starting point for all next days
       const rebalanced = recalculateChain(updatedList);
       await storageService.saveAllTransactions(rebalanced);
-      loadData();
+      await loadData();
+      setIsSyncing(false);
     }
   }, [loadData, t.confirmDelete, recalculateChain]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    if (user) loadData();
+  }, [user, loadData]);
+
+  if (!user) {
+    return <AuthForm t={t} onLogin={handleLogin} onRegister={handleRegister} />;
+  }
 
   const navItems = [
     { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard },
@@ -256,8 +317,20 @@ const App: React.FC = () => {
             <Globe className="w-5 h-5" />
             {t.language}
           </button>
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold rounded-xl transition-all mt-4">
+            <LogOut className="w-5 h-5" />
+            {t.logout}
+          </button>
         </div>
       </nav>
+
+      {/* Syncing Indicator */}
+      {isSyncing && (
+        <div className="fixed top-4 right-4 z-[100] bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl shadow-xl border border-indigo-100 dark:border-indigo-900 flex items-center gap-3 animate-in fade-in slide-in-from-right duration-300">
+          <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
+          <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tighter">{t.calculating}</span>
+        </div>
+      )}
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 py-3 z-50 no-print flex justify-around items-center transition-colors">
         {navItems.map(tab => (
