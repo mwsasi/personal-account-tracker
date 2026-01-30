@@ -58,6 +58,9 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
           { key: 'electricity', label: t.electricity },
           { key: 'water', label: t.water },
           { key: 'travel', label: t.travel },
+          { key: 'fuel', label: t.fuel },
+          { key: 'bikeRepair', label: t.bikeRepair },
+          { key: 'parcel', label: t.parcel },
           { key: 'compoundInvestment', label: t.compoundInvestment },
           { key: 'others', label: t.others },
         ];
@@ -98,7 +101,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     const startBF = Number(firstTx.broughtForward) || 0;
     const endBalance = startBF + totalIncome - totalExpenses;
     
-    const catKeys = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
+    const catKeys = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'fuel', 'bikeRepair', 'parcel', 'compoundInvestment', 'others'];
     const catTotals: Record<string, { actual: number, limit: number }> = {};
     
     const monthsInView = Array.from(new Set(sortedFiltered.map(tx => tx.month)));
@@ -146,7 +149,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     if (sortedFiltered.length === 0) return;
     const workbook = XLSX.utils.book_new();
     
-    // 1. Detailed Transactions Sheet
+    // Detailed Transactions Sheet
     const formattedData = sortedFiltered.map(tx => ({
       [t.date]: tx.date,
       [t.broughtForward]: Number(tx.broughtForward),
@@ -159,6 +162,9 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
       [t.electricity]: Number(tx.electricity || 0),
       [t.water]: Number(tx.water || 0),
       [t.travel]: Number(tx.travel || 0),
+      [t.fuel]: Number(tx.fuel || 0),
+      [t.bikeRepair]: Number(tx.bikeRepair || 0),
+      [t.parcel]: Number(tx.parcel || 0),
       [t.compoundInvestment]: Number(tx.compoundInvestment || 0),
       [t.others]: Number(tx.others || 0),
       [t.totalExpenses]: Number(tx.totalExpenses),
@@ -166,13 +172,12 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     }));
     const ws = XLSX.utils.json_to_sheet(formattedData);
     
-    // Add Auto-filters to Detailed Transactions
     const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
     ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
     
     XLSX.utils.book_append_sheet(workbook, ws, t.detailedTransactions || "Transactions");
 
-    // 2. Monthly Summary Sheet
+    // Monthly Summary Sheet
     if (summary) {
       const summaryAOA = [
         ["FINANCIAL SUMMARY REPORT"],
@@ -266,7 +271,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
             </div>
           </div>
 
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 md:gap-3">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2 md:gap-3">
              {Object.entries(summary.catTotals).map(([key, value]: [string, any]) => (
                <div key={key} className="bg-white/50 dark:bg-slate-900/50 p-2 md:p-3 rounded-lg md:rounded-xl border border-slate-100/50 dark:border-slate-800/50">
                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest truncate">{(t as any)[key]}</p>
@@ -353,7 +358,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
       </div>
 
       <div className="overflow-x-auto">
-        <table className="w-full text-left min-w-[1500px] border-collapse">
+        <table className="w-full text-left min-w-[2000px] border-collapse">
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-200 dark:border-slate-800">
               <th className="px-6 py-4">{t.date}</th>
@@ -367,6 +372,9 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
               <th className="px-4 py-4">{t.electricity}</th>
               <th className="px-4 py-4">{t.water}</th>
               <th className="px-4 py-4">{t.travel}</th>
+              <th className="px-4 py-4">{t.fuel}</th>
+              <th className="px-4 py-4">{t.bikeRepair}</th>
+              <th className="px-4 py-4">{t.parcel}</th>
               <th className="px-4 py-4">{t.compoundInvestment}</th>
               <th className="px-4 py-4">{t.others}</th>
               <th className="px-6 py-4">{t.totalExpenses}</th>
@@ -388,6 +396,9 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.electricity || 0))}</td>
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.water || 0))}</td>
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.travel || 0))}</td>
+                <td className="px-4 py-4 text-amber-600 dark:text-amber-400 font-bold">{formatCurrency(Number(tx.fuel || 0))}</td>
+                <td className="px-4 py-4 text-blue-600 dark:text-blue-400 font-bold">{formatCurrency(Number(tx.bikeRepair || 0))}</td>
+                <td className="px-4 py-4 text-purple-600 dark:text-purple-400 font-bold">{formatCurrency(Number(tx.parcel || 0))}</td>
                 <td className="px-4 py-4 font-bold text-teal-600 dark:text-teal-400">{formatCurrency(Number(tx.compoundInvestment || 0))}</td>
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.others || 0))}</td>
                 <td className="px-6 py-4 font-bold text-rose-500 dark:text-rose-400">{formatCurrency(Number(tx.totalExpenses))}</td>

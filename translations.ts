@@ -18,6 +18,9 @@ export const translations = {
     electricity: "Electricity",
     water: "Water Bill",
     travel: "Travel",
+    fuel: "Fuel",
+    bikeRepair: "Bike Repair",
+    parcel: "Parcel",
     compoundInvestment: "Compound Investment",
     others: "Others",
     dailyCash: "Cash Received",
@@ -127,7 +130,8 @@ export const translations = {
     syncFromDashboard: "Sync Actuals",
     syncSuccess: "Dashboard investments synced!",
     useActualAverage: "Use Actual Monthly Average",
-    recentInvestmentEntries: "Recent Investments"
+    recentInvestmentEntries: "Recent Investments",
+    parallelLog: "Parallel Log"
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -147,6 +151,9 @@ export const translations = {
     electricity: "විදුලි බිල",
     water: "ජල බිල",
     travel: "ගමන් වියදම්",
+    fuel: "ඉන්ධන",
+    bikeRepair: "යතුරුපැදි අලුත්වැඩියාව",
+    parcel: "පාර්සල්",
     compoundInvestment: "සමුච්චිත ආයෝජන",
     others: "වෙනත්",
     dailyCash: "ලැබුණු මුදල්",
@@ -255,7 +262,8 @@ export const translations = {
     actualTotalInvested: "සැබෑ මුළු ආයෝජනය",
     syncFromDashboard: "සමමුහුර්ත කරන්න",
     syncSuccess: "සමමුහුර්ත කරන ලදී",
-    useActualAverage: "සැබෑ සාමාන්‍යය භාවිතා කරන්න",
-    recentInvestmentEntries: "මෑතකාලීන ආයෝජන"
+    useActualAverage: "සැබෑ සාමාන්්‍යය භාවිතා කරන්න",
+    recentInvestmentEntries: "මෑතකාලීන ආයෝජන",
+    parallelLog: "සමාන්තර සටහන"
   }
 };

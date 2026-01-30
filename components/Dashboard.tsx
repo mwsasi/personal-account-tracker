@@ -1,3 +1,4 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, MonthlyBudget, Notification } from '../types.ts';
 import TransactionForm from './TransactionForm.tsx';
@@ -11,7 +12,7 @@ import {
   AlertCircle, Clock, History, BellRing, TriangleAlert, Zap, 
   CheckCircle2, ArrowRightCircle, ShoppingBag, Leaf, Fish, 
   Drumstick, Home, Droplets, Car, PlusCircle, LayoutGrid, CalendarDays,
-  ChevronDown, TrendingUp
+  ChevronDown, TrendingUp, Fuel, Wrench, Package
 } from 'lucide-react';
 import { storageService } from '../services/googleSheets.ts';
 
@@ -89,7 +90,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const activeBudget = useMemo(() => {
     return budgets.find(b => b.month === selectedMonthKey) || {
       month: selectedMonthKey,
-      limits: { groceries: 0, vegetables: 0, fishEgg: 0, chicken: 0, houseRent: 0, electricity: 0, water: 0, travel: 0, compoundInvestment: 0, others: 0 }
+      limits: { groceries: 0, vegetables: 0, fishEgg: 0, chicken: 0, houseRent: 0, electricity: 0, water: 0, travel: 0, fuel: 0, bikeRepair: 0, parcel: 0, compoundInvestment: 0, others: 0 }
     };
   }, [budgets, selectedMonthKey]);
 
@@ -109,6 +110,9 @@ const Dashboard: React.FC<DashboardProps> = ({
       { key: 'electricity', label: t.electricity, icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
       { key: 'water', label: t.water, icon: Droplets, color: 'text-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-900/20' },
       { key: 'travel', label: t.travel, icon: Car, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+      { key: 'fuel', label: t.fuel, icon: Fuel, color: 'text-amber-500', bg: 'bg-amber-50 dark:bg-amber-900/20' },
+      { key: 'bikeRepair', label: t.bikeRepair, icon: Wrench, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+      { key: 'parcel', label: t.parcel, icon: Package, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-900/20' },
       { key: 'compoundInvestment', label: t.compoundInvestment, icon: TrendingUp, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/20' },
       { key: 'others', label: t.others, icon: PlusCircle, color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-800/50' },
     ];

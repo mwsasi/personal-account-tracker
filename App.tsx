@@ -110,8 +110,8 @@ const App: React.FC = () => {
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    // NOTE: 'compoundInvestment' is removed from categories list for summation
-    // so it doesn't affect totalExpenses or liquid totalBalance.
+    // NOTE: Parallel log categories (compoundInvestment, fuel, bikeRepair, parcel) 
+    // are EXCLUDED from the expense summation list below.
     const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
 
     let runningBalance = 0;
@@ -161,7 +161,6 @@ const App: React.FC = () => {
       const newNotifications: Notification[] = [];
 
       if (budget) {
-        // Budget logic still monitors spending categories
         const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
         categories.forEach(cat => {
           const limit = (budget.limits as any)[cat];
@@ -233,7 +232,7 @@ const App: React.FC = () => {
       let newList;
       if (existingIndex !== -1) {
         const existing = freshTransactions[existingIndex];
-        const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
+        const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'fuel', 'bikeRepair', 'parcel', 'compoundInvestment', 'others'];
         const merged: Transaction = {
           ...existing,
           dailyCash: Number(existing.dailyCash || 0) + Number(data.dailyCash || 0),

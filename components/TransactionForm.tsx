@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Transaction } from '../types';
-import { AlertCircle, RefreshCw, BadgeAlert, TrendingUp, Sparkles } from 'lucide-react';
+import { AlertCircle, RefreshCw, BadgeAlert, TrendingUp, Sparkles, Fuel, Wrench, Package } from 'lucide-react';
 
 interface TransactionFormProps {
   t: any;
@@ -22,6 +22,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
     electricity: '' as any,
     water: '' as any,
     travel: '' as any,
+    fuel: '' as any,
+    bikeRepair: '' as any,
+    parcel: '' as any,
     compoundInvestment: '' as any,
     others: '' as any,
     dailyCash: '' as any,
@@ -43,6 +46,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
         electricity: initialData.electricity || '',
         water: initialData.water || '',
         travel: initialData.travel || '',
+        fuel: initialData.fuel || '',
+        bikeRepair: initialData.bikeRepair || '',
+        parcel: initialData.parcel || '',
         compoundInvestment: initialData.compoundInvestment || '',
         others: initialData.others || '',
         dailyCash: initialData.dailyCash || '',
@@ -94,7 +100,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
     return isNaN(n) ? 0 : n;
   };
 
-  // NOTE: 'compoundInvestment' is EXCLUDED from totalExpenses sum
+  // Standard expenses (Liquid Balance impact)
   const totalExpenses = 
     val(formData.groceries) + 
     val(formData.vegetables) + 
@@ -106,7 +112,6 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
     val(formData.travel) +
     val(formData.others);
 
-  // totalBalance preview also excludes compoundInvestment to match App recalculateChain logic
   const totalBalance = val(formData.broughtForward) + val(formData.dailyCash) - totalExpenses;
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -126,6 +131,9 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
       electricity: val(formData.electricity),
       water: val(formData.water),
       travel: val(formData.travel),
+      fuel: val(formData.fuel),
+      bikeRepair: val(formData.bikeRepair),
+      parcel: val(formData.parcel),
       compoundInvestment: val(formData.compoundInvestment),
       others: val(formData.others),
       dailyCash: val(formData.dailyCash),
@@ -185,66 +193,111 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest pl-1 mb-1">{t.dailyCash}</label>
-            <input
-              type="number"
-              name="dailyCash"
-              placeholder="0"
-              min="0"
-              className="w-full px-4 py-3 rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50/30 dark:bg-emerald-900/10 font-black text-emerald-800 dark:text-emerald-200 transition-all focus:ring-2 focus:ring-emerald-500 outline-none"
-              value={formData.dailyCash === '' ? '' : formData.dailyCash}
-              onChange={handleChange}
-            />
-          </div>
-          
-          {/* Compound Investment: Parallel Entry styling */}
-          <div className="relative group">
-            <div className="flex justify-between items-center mb-1 px-1">
-              <label className="block text-xs font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest">{t.compoundInvestment}</label>
-              <div className="flex items-center gap-1 text-[8px] font-black text-teal-500 bg-teal-50 dark:bg-teal-900/20 px-1.5 py-0.5 rounded-full uppercase tracking-tighter">
-                 <Sparkles className="w-2 h-2" /> Parallel Entry
-              </div>
-            </div>
-            <div className="relative">
-              <input
-                type="number"
-                name="compoundInvestment"
-                placeholder="0"
-                min="0"
-                className="w-full px-4 py-3 rounded-2xl border border-teal-200 dark:border-teal-800 bg-teal-50/20 dark:bg-teal-900/10 font-black text-teal-700 dark:text-teal-300 transition-all focus:ring-2 focus:ring-teal-500 outline-none text-sm"
-                value={formData.compoundInvestment === '' ? '' : formData.compoundInvestment}
-                onChange={handleChange}
-              />
-              <TrendingUp className="absolute right-4 top-1/2 -translate-y-1/2 w-4 h-4 text-teal-400/50 group-focus-within:text-teal-500 transition-colors pointer-events-none" />
-            </div>
-          </div>
+        {/* Liquid Funds Input */}
+        <div className="p-5 bg-emerald-50/30 dark:bg-emerald-900/10 rounded-3xl border border-emerald-100 dark:border-emerald-900/30">
+          <label className="block text-xs font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest pl-1 mb-2">{t.dailyCash}</label>
+          <input
+            type="number"
+            name="dailyCash"
+            placeholder="0"
+            min="0"
+            className="w-full px-4 py-3 rounded-2xl border border-emerald-100 dark:border-emerald-800 bg-white dark:bg-slate-900 font-black text-emerald-800 dark:text-emerald-200 transition-all focus:ring-2 focus:ring-emerald-500 outline-none"
+            value={formData.dailyCash === '' ? '' : formData.dailyCash}
+            onChange={handleChange}
+          />
+        </div>
 
-          {[
-            { name: 'groceries', label: t.groceries },
-            { name: 'vegetables', label: t.vegetables },
-            { name: 'fishEgg', label: t.fishEgg },
-            { name: 'chicken', label: t.chicken },
-            { name: 'houseRent', label: t.houseRent },
-            { name: 'electricity', label: t.electricity },
-            { name: 'water', label: t.water },
-            { name: 'travel', label: t.travel },
-            { name: 'others', label: t.others },
-          ].map(field => (
-            <div key={field.name}>
-              <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1 mb-1">{field.label}</label>
-              <input
-                type="number"
-                name={field.name}
-                placeholder="0"
-                min="0"
-                className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm"
-                value={(formData as any)[field.name] === '' ? '' : (formData as any)[field.name]}
-                onChange={handleChange}
-              />
-            </div>
-          ))}
+        {/* Parallel Logs Section */}
+        <div className="space-y-4">
+           <div className="flex items-center gap-2 px-1">
+              <Sparkles className="w-4 h-4 text-amber-500" />
+              <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.parallelLog} (Records Only)</h3>
+           </div>
+           
+           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* Compound Investment */}
+              <div className="relative group">
+                <label className="block text-[10px] font-black text-teal-600 dark:text-teal-400 uppercase tracking-widest mb-1 pl-1">{t.compoundInvestment}</label>
+                <div className="relative">
+                  <input
+                    type="number" name="compoundInvestment" placeholder="0" min="0"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-teal-200 dark:border-teal-800 bg-teal-50/20 dark:bg-teal-900/10 font-black text-teal-700 dark:text-teal-300 outline-none text-xs"
+                    value={formData.compoundInvestment === '' ? '' : formData.compoundInvestment} onChange={handleChange}
+                  />
+                  <TrendingUp className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-teal-400" />
+                </div>
+              </div>
+
+              {/* Fuel */}
+              <div className="relative group">
+                <label className="block text-[10px] font-black text-amber-600 dark:text-amber-400 uppercase tracking-widest mb-1 pl-1">{t.fuel}</label>
+                <div className="relative">
+                  <input
+                    type="number" name="fuel" placeholder="0" min="0"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50/20 dark:bg-amber-900/10 font-black text-amber-700 dark:text-amber-300 outline-none text-xs"
+                    value={formData.fuel === '' ? '' : formData.fuel} onChange={handleChange}
+                  />
+                  <Fuel className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-amber-400" />
+                </div>
+              </div>
+
+              {/* Bike Repair */}
+              <div className="relative group">
+                <label className="block text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest mb-1 pl-1">{t.bikeRepair}</label>
+                <div className="relative">
+                  <input
+                    type="number" name="bikeRepair" placeholder="0" min="0"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/20 dark:bg-blue-900/10 font-black text-blue-700 dark:text-blue-300 outline-none text-xs"
+                    value={formData.bikeRepair === '' ? '' : formData.bikeRepair} onChange={handleChange}
+                  />
+                  <Wrench className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-blue-400" />
+                </div>
+              </div>
+
+              {/* Parcel */}
+              <div className="relative group">
+                <label className="block text-[10px] font-black text-purple-600 dark:text-purple-400 uppercase tracking-widest mb-1 pl-1">{t.parcel}</label>
+                <div className="relative">
+                  <input
+                    type="number" name="parcel" placeholder="0" min="0"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-purple-200 dark:border-purple-800 bg-purple-50/20 dark:bg-purple-900/10 font-black text-purple-700 dark:text-purple-300 outline-none text-xs"
+                    value={formData.parcel === '' ? '' : formData.parcel} onChange={handleChange}
+                  />
+                  <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-purple-400" />
+                </div>
+              </div>
+           </div>
+        </div>
+
+        {/* Daily Expenses Section */}
+        <div className="space-y-4">
+           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-1">Standard Daily Expenses</h3>
+           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            {[
+              { name: 'groceries', label: t.groceries },
+              { name: 'vegetables', label: t.vegetables },
+              { name: 'fishEgg', label: t.fishEgg },
+              { name: 'chicken', label: t.chicken },
+              { name: 'houseRent', label: t.houseRent },
+              { name: 'electricity', label: t.electricity },
+              { name: 'water', label: t.water },
+              { name: 'travel', label: t.travel },
+              { name: 'others', label: t.others },
+            ].map(field => (
+              <div key={field.name}>
+                <label className="block text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1 mb-1">{field.label}</label>
+                <input
+                  type="number"
+                  name={field.name}
+                  placeholder="0"
+                  min="0"
+                  className="w-full px-4 py-2.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-xs"
+                  value={(formData as any)[field.name] === '' ? '' : (formData as any)[field.name]}
+                  onChange={handleChange}
+                />
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="p-6 bg-slate-50 dark:bg-slate-800/50 rounded-3xl flex flex-wrap gap-12 items-center justify-center border border-slate-100 dark:border-slate-800 transition-colors shadow-inner">

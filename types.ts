@@ -11,6 +11,9 @@ export interface Transaction {
   electricity: number;
   water: number;
   travel: number;
+  fuel: number;
+  bikeRepair: number;
+  parcel: number;
   compoundInvestment: number;
   others: number;
   dailyCash: number;
@@ -39,6 +42,9 @@ export interface MonthlyBudget {
     electricity: number;
     water: number;
     travel: number;
+    fuel: number;
+    bikeRepair: number;
+    parcel: number;
     compoundInvestment: number;
     others: number;
   };
