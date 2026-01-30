@@ -110,7 +110,9 @@ const App: React.FC = () => {
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
+    // NOTE: 'compoundInvestment' is removed from categories list for summation
+    // so it doesn't affect totalExpenses or liquid totalBalance.
+    const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
 
     let runningBalance = 0;
     return sorted.map((tx, index) => {
@@ -159,7 +161,8 @@ const App: React.FC = () => {
       const newNotifications: Notification[] = [];
 
       if (budget) {
-        const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
+        // Budget logic still monitors spending categories
+        const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
         categories.forEach(cat => {
           const limit = (budget.limits as any)[cat];
           const spent = currentMonthTxs.reduce((sum, tx) => sum + (Number((tx as any)[cat]) || 0), 0);

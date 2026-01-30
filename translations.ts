@@ -122,7 +122,12 @@ export const translations = {
     importSuccess: "Data imported successfully!",
     importError: "Failed to import data. Please check the file format.",
     exportSuccess: "Backup file downloaded.",
-    rememberMe: "Remember me"
+    rememberMe: "Remember me",
+    actualTotalInvested: "Actual Invested (from Dashboard)",
+    syncFromDashboard: "Sync Actuals",
+    syncSuccess: "Dashboard investments synced!",
+    useActualAverage: "Use Actual Monthly Average",
+    recentInvestmentEntries: "Recent Investments"
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -246,6 +251,11 @@ export const translations = {
     importSuccess: "දත්ත සාර්ථකව ආනයනය කරන ලදී!",
     importError: "දත්ත ආනයනය අසාර්ථක විය. කරුණාකර ගොනුව පරීක්ෂා කරන්න.",
     exportSuccess: "රක්ෂිත ගොනුව බාගත කරන ලදී.",
-    rememberMe: "මාව මතක තබා ගන්න"
+    rememberMe: "මාව මතක තබා ගන්න",
+    actualTotalInvested: "සැබෑ මුළු ආයෝජනය",
+    syncFromDashboard: "සමමුහුර්ත කරන්න",
+    syncSuccess: "සමමුහුර්ත කරන ලදී",
+    useActualAverage: "සැබෑ සාමාන්‍යය භාවිතා කරන්න",
+    recentInvestmentEntries: "මෑතකාලීන ආයෝජන"
   }
 };
