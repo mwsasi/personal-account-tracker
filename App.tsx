@@ -1,14 +1,13 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
-import { Transaction, Language, CurrencySettings, Notification } from './types';
-import { translations } from './translations';
-import { storageService } from './services/googleSheets';
-import Dashboard from './components/Dashboard';
-import SettingsPage from './components/SettingsPage';
-import NotificationDrawer from './components/NotificationDrawer';
-import BillManager from './components/BillManager';
-import InvestmentTracker from './components/InvestmentTracker';
-import AuthForm from './components/AuthForm';
+import { Transaction, Language, CurrencySettings, Notification } from './types.ts';
+import { translations } from './translations.ts';
+import { storageService } from './services/googleSheets.ts';
+import Dashboard from './components/Dashboard.tsx';
+import SettingsPage from './components/SettingsPage.tsx';
+import NotificationDrawer from './components/NotificationDrawer.tsx';
+import BillManager from './components/BillManager.tsx';
+import InvestmentTracker from './components/InvestmentTracker.tsx';
+import AuthForm from './components/AuthForm.tsx';
 import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw, AlertCircle, CheckCircle2, TrendingUp } from 'lucide-react';
 
 interface ToastState {

@@ -1,11 +1,11 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Transaction, MonthlyBudget, Notification } from '../types';
-import TransactionForm from './TransactionForm';
-import StatsOverview from './StatsOverview';
-import MonthlyCharts from './MonthlyCharts';
-import HistoryTable from './HistoryTable';
-import BudgetManager from './BudgetManager';
-import BudgetPerformance from './BudgetPerformance';
+import { Transaction, MonthlyBudget, Notification } from '../types.ts';
+import TransactionForm from './TransactionForm.tsx';
+import StatsOverview from './StatsOverview.tsx';
+import MonthlyCharts from './MonthlyCharts.tsx';
+import HistoryTable from './HistoryTable.tsx';
+import BudgetManager from './BudgetManager.tsx';
+import BudgetPerformance from './BudgetPerformance.tsx';
 import { 
   Plus, X, Calendar, BarChart3, ClipboardList, ArrowRight, Target, 
   AlertCircle, Clock, History, BellRing, TriangleAlert, Zap, 
@@ -13,11 +13,11 @@ import {
   Drumstick, Home, Droplets, Car, PlusCircle, LayoutGrid, CalendarDays,
   ChevronDown, TrendingUp
 } from 'lucide-react';
-import { storageService } from '../services/googleSheets';
+import { storageService } from '../services/googleSheets.ts';
 
 interface DashboardProps {
-  activeTab: 'dashboard' | 'analytics' | 'history' | 'budget' | 'bills' | 'settings';
-  setActiveTab?: (tab: 'dashboard' | 'analytics' | 'history' | 'budget' | 'bills' | 'settings') => void;
+  activeTab: 'dashboard' | 'analytics' | 'history' | 'budget' | 'bills' | 'settings' | 'investments';
+  setActiveTab?: (tab: 'dashboard' | 'analytics' | 'history' | 'budget' | 'bills' | 'settings' | 'investments') => void;
   t: any;
   transactions: Transaction[];
   onAdd: (data: Transaction) => void;
