@@ -1,7 +1,7 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction } from '../types';
-import { TrendingUp, Target, Calculator, Info, Calendar, ChevronDown, ArrowUpRight, BarChart4, Wallet } from 'lucide-react';
+import { TrendingUp, Target, Calculator, Info, Calendar, ChevronDown, ArrowUpRight, BarChart4, Wallet, Save } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface InvestmentTrackerProps {
@@ -10,20 +10,41 @@ interface InvestmentTrackerProps {
   transactions: Transaction[];
 }
 
+const STORAGE_KEY = 'finance_tracker_v3_investment_plan';
+
 const InvestmentTracker: React.FC<InvestmentTrackerProps> = ({ t, formatCurrency, transactions }) => {
   const isDark = document.documentElement.classList.contains('dark');
   
-  // Get initial principal from total compoundInvestment transactions
+  // Get initial principal from total compoundInvestment transactions as a fallback
   const currentTotalInvested = useMemo(() => {
     return transactions.reduce((sum, tx) => sum + (Number(tx.compoundInvestment) || 0), 0);
   }, [transactions]);
 
-  const [principal, setPrincipal] = useState<number>(currentTotalInvested || 10000);
-  const [contributionAmount, setContributionAmount] = useState<number>(1000);
-  const [contributionFrequency, setContributionFrequency] = useState<'daily' | 'monthly'>('monthly');
-  const [annualRate, setAnnualRate] = useState<number>(8);
-  const [years, setYears] = useState<number>(10);
-  const [compoundingFreq, setCompoundingFreq] = useState<number>(12); // Default to monthly compounding
+  // Load saved settings from localStorage
+  const savedSettings = useMemo(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    return saved ? JSON.parse(saved) : null;
+  }, []);
+
+  const [principal, setPrincipal] = useState<number>(savedSettings?.principal ?? currentTotalInvested ?? 10000);
+  const [contributionAmount, setContributionAmount] = useState<number>(savedSettings?.contributionAmount ?? 1000);
+  const [contributionFrequency, setContributionFrequency] = useState<'daily' | 'monthly'>(savedSettings?.contributionFrequency ?? 'monthly');
+  const [annualRate, setAnnualRate] = useState<number>(savedSettings?.annualRate ?? 8);
+  const [years, setYears] = useState<number>(savedSettings?.years ?? 10);
+  const [compoundingFreq, setCompoundingFreq] = useState<number>(savedSettings?.compoundingFreq ?? 12);
+
+  // Auto-save settings whenever they change
+  useEffect(() => {
+    const settings = {
+      principal,
+      contributionAmount,
+      contributionFrequency,
+      annualRate,
+      years,
+      compoundingFreq
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+  }, [principal, contributionAmount, contributionFrequency, annualRate, years, compoundingFreq]);
 
   const projectionData = useMemo(() => {
     const data = [];
@@ -81,13 +102,19 @@ const InvestmentTracker: React.FC<InvestmentTrackerProps> = ({ t, formatCurrency
 
   return (
     <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-      <div className="flex items-center gap-3">
-        <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-xl">
-          <TrendingUp className="w-6 h-6 text-teal-700 dark:text-teal-400" />
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-teal-100 dark:bg-teal-900/30 rounded-xl">
+            <TrendingUp className="w-6 h-6 text-teal-700 dark:text-teal-400" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">{t.investments}</h2>
+            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.compoundCalculator}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-tight">{t.investments}</h2>
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{t.compoundCalculator}</p>
+        <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-900/20 rounded-xl border border-emerald-100 dark:border-emerald-800">
+          <Save className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+          <span className="text-[10px] font-black text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">Settings Auto-saved</span>
         </div>
       </div>
 
