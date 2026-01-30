@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Wallet, Mail, Lock, User, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
+import { Wallet, Mail, Lock, User, ArrowRight, Loader2, AlertCircle, Eye, EyeOff } from 'lucide-react';
 
 interface AuthFormProps {
   t: any;
@@ -11,7 +11,9 @@ interface AuthFormProps {
 const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState('');
 
   const validateEmail = (email: string) => {
@@ -55,6 +57,10 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
     }
   };
 
+  const togglePasswordVisibility = () => {
+    setShowPassword(!showPassword);
+  };
+
   return (
     <div className="min-h-screen flex items-center justify-center p-4 bg-slate-50 dark:bg-slate-950 font-sans transition-colors duration-300">
       <div className="w-full max-w-md">
@@ -81,6 +87,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                   <input
                     required type="text"
+                    name="name"
+                    autoComplete="name"
                     className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
                     placeholder="John Doe" value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
@@ -95,6 +103,8 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input
                   required type="email"
+                  name="email"
+                  autoComplete="email"
                   className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
                   placeholder="name@example.com" value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
@@ -107,12 +117,33 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input
-                  required type="password"
-                  className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
+                  required type={showPassword ? 'text' : 'password'}
+                  name="password"
+                  autoComplete={isLogin ? "current-password" : "new-password"}
+                  className="w-full pl-12 pr-12 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
                   placeholder="••••••••" value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
+                <button 
+                  type="button"
+                  onClick={togglePasswordVisibility}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-indigo-500 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-between px-1">
+              <label className="flex items-center gap-2 cursor-pointer group">
+                <input 
+                  type="checkbox" 
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="w-4 h-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                />
+                <span className="text-xs font-bold text-slate-500 dark:text-slate-400 group-hover:text-indigo-600 transition-colors">{t.rememberMe}</span>
+              </label>
             </div>
 
             <button

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Transaction, Language, CurrencySettings, Notification } from './types.ts';
 import { translations } from './translations.ts';
@@ -406,6 +407,7 @@ const App: React.FC = () => {
               isDark={isDark}
               onToggleDark={() => setIsDark(!isDark)}
               onSave={(s) => { setCurrencySettings(s); localStorage.setItem('currency_settings', JSON.stringify(s)); showToast(t.settingsSaved, 'success'); }} 
+              onRefresh={loadData}
             />
           )}
           {activeTab === 'bills' && <BillManager t={t} formatCurrency={formatCurrency} transactions={transactions} onRefresh={loadData} />}

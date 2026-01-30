@@ -78,7 +78,7 @@ export const translations = {
     endDate: "End Date",
     clearFilters: "Clear",
     printReport: "Print Report",
-    exportExcel: "Export Excel",
+    exportExcel: "Export Excel Report",
     applyFilters: "Apply Filters",
     futureDateError: "Future dates are not allowed",
     payBill: "Pay Bill",
@@ -112,7 +112,17 @@ export const translations = {
     daily: "Daily",
     monthly: "Monthly",
     quarterly: "Quarterly",
-    annually: "Annually"
+    annually: "Annually",
+    monthlyReport: "Monthly Report",
+    detailedTransactions: "Detailed Transactions",
+    backupRestore: "Backup & Restore",
+    exportData: "Export Data (JSON)",
+    importData: "Import Data (JSON)",
+    importConfirm: "This will overwrite your current data with the backup. Are you sure?",
+    importSuccess: "Data imported successfully!",
+    importError: "Failed to import data. Please check the file format.",
+    exportSuccess: "Backup file downloaded.",
+    rememberMe: "Remember me"
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -181,7 +191,7 @@ export const translations = {
     billDueIn: "දින {days} කින් ගෙවිය යුතුය",
     dueToday: "අද ගෙවිය යුතුය!",
     lowBudgetAlert: "අඩු අයවැය අනතුරු ඇඟවීම",
-    unusualSpending: "අසාමාන්‍ය වියදම්",
+    unusualSpending: "අසාමාන්්‍ය වියදම්",
     unusualSpendingMsg: "{category} සඳහා ඔබේ වියදම පසුගිය මාසයට වඩා 50% කින් වැඩිය.",
     lowBudgetMsg: "ඔබ {category} අයවැයෙන් {percent}% ක් භාවිතා කර ඇත.",
     darkMode: "අඳුරු ප්‍රකාරය",
@@ -216,7 +226,7 @@ export const translations = {
     compoundCalculator: "සමුච්චිත පොලී ගණකය",
     principal: "මූලික මුදල",
     monthlyContribution: "මාසික දායකත්වය",
-    annualRate: "වාර්ෂික පොලී අනුපාතය (%)",
+    annualRate: "වාර්ික පොලී අනුපාතය (%)",
     years: "වසර ගණන",
     futureValue: "අනාගත අගය",
     totalInvested: "මුළු ආයෝජනය",
@@ -226,6 +236,16 @@ export const translations = {
     daily: "දිනපතා",
     monthly: "මාසිකව",
     quarterly: "කාර්තුවකට වරක්",
-    annually: "වාර්ෂිකව"
+    annually: "වාර්ෂිකව",
+    monthlyReport: "මාසික වාර්තාව",
+    detailedTransactions: "විස්තරාත්මක ගනුදෙනු",
+    backupRestore: "දත්ත රක්ෂිතය (Backup)",
+    exportData: "දත්ත අපනයනය (JSON)",
+    importData: "දත්ත ආනයනය (JSON)",
+    importConfirm: "මෙය ඔබගේ වත්මන් දත්ත මකා දමා රක්ෂිත දත්ත ඇතුළත් කරනු ඇත. ඔබට විශ්වාසද?",
+    importSuccess: "දත්ත සාර්ථකව ආනයනය කරන ලදී!",
+    importError: "දත්ත ආනයනය අසාර්ථක විය. කරුණාකර ගොනුව පරීක්ෂා කරන්න.",
+    exportSuccess: "රක්ෂිත ගොනුව බාගත කරන ලදී.",
+    rememberMe: "මාව මතක තබා ගන්න"
   }
 };

@@ -1,6 +1,7 @@
+
 import React, { useState, useMemo, useCallback } from 'react';
 import { Transaction, MonthlyBudget } from '../types';
-import { Edit2, Trash2, FileSpreadsheet, Printer, Search, X, Calendar as CalendarIcon, Filter, PieChart, AlertCircle, TrendingDown } from 'lucide-react';
+import { Edit2, Trash2, FileSpreadsheet, Printer, Search, X, Calendar as CalendarIcon, Filter, PieChart, AlertCircle, TrendingDown, LayoutList } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 interface HistoryTableProps {
@@ -100,9 +101,9 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     const catKeys = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
     const catTotals: Record<string, { actual: number, limit: number }> = {};
     
-    const monthsInView = new Set(sortedFiltered.map(tx => tx.month));
-    const isSingleMonth = monthsInView.size === 1;
-    const currentMonthLabel = Array.from(monthsInView)[0];
+    const monthsInView = Array.from(new Set(sortedFiltered.map(tx => tx.month)));
+    const isSingleMonth = monthsInView.length === 1;
+    const currentMonthLabel = monthsInView[0];
     const activeBudget = isSingleMonth ? budgets.find(b => b.month === currentMonthLabel) : null;
 
     catKeys.forEach(key => {
@@ -119,6 +120,14 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
       return { key, label: (t as any)[key], spent, limit, isOver, progress };
     }).filter(a => a.isOver || (a.limit > 0 && a.progress >= 85)) : [];
 
+    // Monthly breakdown for Excel Report
+    const monthlyBreakdown = monthsInView.map(m => {
+      const txs = sortedFiltered.filter(tx => tx.month === m);
+      const inc = txs.reduce((s, tx) => s + (Number(tx.dailyCash) || 0), 0);
+      const exp = txs.reduce((s, tx) => s + (Number(tx.totalExpenses) || 0), 0);
+      return { month: m, income: inc, expenses: exp, net: inc - exp };
+    });
+
     return {
       startBF,
       totalIncome,
@@ -126,8 +135,10 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
       endBalance,
       isSingleMonth,
       currentMonthLabel,
+      monthsInView,
       catTotals,
-      budgetAlerts
+      budgetAlerts,
+      monthlyBreakdown
     };
   }, [sortedFiltered, budgets, t]);
 
@@ -135,47 +146,61 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     if (sortedFiltered.length === 0) return;
     const workbook = XLSX.utils.book_new();
     
+    // 1. Detailed Transactions Sheet
     const formattedData = sortedFiltered.map(tx => ({
       [t.date]: tx.date,
-      [t.broughtForward]: Number(tx.broughtForward).toFixed(2),
-      [t.dailyCash]: Number(tx.dailyCash).toFixed(2),
-      [t.groceries]: Number(tx.groceries).toFixed(2),
-      [t.vegetables]: Number(tx.vegetables).toFixed(2),
-      [t.fishEgg]: Number(tx.fishEgg).toFixed(2),
-      [t.chicken]: Number(tx.chicken).toFixed(2),
-      [t.houseRent]: Number(tx.houseRent).toFixed(2),
-      [t.electricity]: Number(tx.electricity).toFixed(2),
-      [t.water]: Number(tx.water).toFixed(2),
-      [t.travel]: Number(tx.travel).toFixed(2),
-      [t.compoundInvestment]: Number(tx.compoundInvestment).toFixed(2),
-      [t.others]: Number(tx.others).toFixed(2),
-      [t.totalExpenses]: Number(tx.totalExpenses).toFixed(2),
-      [t.totalBalance]: Number(tx.totalBalance).toFixed(2),
+      [t.broughtForward]: Number(tx.broughtForward),
+      [t.dailyCash]: Number(tx.dailyCash),
+      [t.groceries]: Number(tx.groceries || 0),
+      [t.vegetables]: Number(tx.vegetables || 0),
+      [t.fishEgg]: Number(tx.fishEgg || 0),
+      [t.chicken]: Number(tx.chicken || 0),
+      [t.houseRent]: Number(tx.houseRent || 0),
+      [t.electricity]: Number(tx.electricity || 0),
+      [t.water]: Number(tx.water || 0),
+      [t.travel]: Number(tx.travel || 0),
+      [t.compoundInvestment]: Number(tx.compoundInvestment || 0),
+      [t.others]: Number(tx.others || 0),
+      [t.totalExpenses]: Number(tx.totalExpenses),
+      [t.totalBalance]: Number(tx.totalBalance),
     }));
     const ws = XLSX.utils.json_to_sheet(formattedData);
-    XLSX.utils.book_append_sheet(workbook, ws, "Transactions");
+    
+    // Add Auto-filters to Detailed Transactions
+    const range = XLSX.utils.decode_range(ws['!ref'] || 'A1');
+    ws['!autofilter'] = { ref: XLSX.utils.encode_range(range) };
+    
+    XLSX.utils.book_append_sheet(workbook, ws, t.detailedTransactions || "Transactions");
 
+    // 2. Monthly Summary Sheet
     if (summary) {
       const summaryAOA = [
         ["FINANCIAL SUMMARY REPORT"],
         ["Generated Date", new Date().toLocaleString()],
-        ["Month / Period", summary.isSingleMonth ? summary.currentMonthLabel : "Filtered Range"],
+        ["Period", summary.isSingleMonth ? summary.currentMonthLabel : `Custom Range (${activeStart || 'Start'} to ${activeEnd || 'End'})`],
         [],
-        ["SUMMARY METRICS", "AMOUNT"],
-        [t.broughtForward, Number(summary.startBF).toFixed(2)],
-        [t.totalIncome, Number(summary.totalIncome).toFixed(2)],
-        [t.totalExpenses, Number(summary.totalExpenses).toFixed(2)],
-        [t.totalBalance, Number(summary.endBalance).toFixed(2)],
+        ["OVERALL METRICS", "AMOUNT"],
+        [t.broughtForward, Number(summary.startBF)],
+        [t.totalIncome, Number(summary.totalIncome)],
+        [t.totalExpenses, Number(summary.totalExpenses)],
+        [t.totalBalance, Number(summary.endBalance)],
         [],
         ["CATEGORY BREAKDOWN", "TOTAL SPENT"],
       ];
 
       Object.entries(summary.catTotals).forEach(([key, val]: [string, any]) => {
-        summaryAOA.push([(t as any)[key], Number(val.actual).toFixed(2)]);
+        summaryAOA.push([(t as any)[key], Number(val.actual)]);
       });
 
+      if (!summary.isSingleMonth) {
+        summaryAOA.push([], ["MONTHLY BREAKDOWN", "INCOME", "EXPENSES", "NET"]);
+        summary.monthlyBreakdown.forEach(m => {
+          summaryAOA.push([m.month, m.income, m.expenses, m.net]);
+        });
+      }
+
       const wsSummary = XLSX.utils.aoa_to_sheet(summaryAOA);
-      XLSX.utils.book_append_sheet(workbook, wsSummary, "Monthly Summary");
+      XLSX.utils.book_append_sheet(workbook, wsSummary, t.summary || "Monthly Summary");
     }
     
     XLSX.writeFile(workbook, `Finance_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -273,36 +298,57 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
             />
           </div>
           <div className="lg:col-span-5 flex items-center gap-2">
-            <div className={`flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border transition-colors ${stagedStart !== activeStart ? 'border-indigo-400' : 'border-slate-200 dark:border-slate-700'}`}>
-              <CalendarIcon className="w-3.5 h-3.5 text-slate-300 mr-2" />
-              <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedStart} onChange={(e) => setStagedStart(e.target.value)} onKeyDown={handleKeyDown} />
+            <div className={`flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border transition-colors ${stagedStart !== activeStart ? 'border-indigo-400 ring-1 ring-indigo-400/20' : 'border-slate-200 dark:border-slate-700'}`}>
+              <div className="flex flex-col w-full">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">{t.startDate}</span>
+                <div className="flex items-center">
+                  <CalendarIcon className="w-3.5 h-3.5 text-slate-300 mr-2 shrink-0" />
+                  <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedStart} onChange={(e) => setStagedStart(e.target.value)} onKeyDown={handleKeyDown} />
+                </div>
+              </div>
             </div>
             <span className="text-slate-400 font-bold px-1">→</span>
-            <div className={`flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border transition-colors ${stagedEnd !== activeEnd ? 'border-indigo-400' : 'border-slate-200 dark:border-slate-700'}`}>
-              <CalendarIcon className="w-3.5 h-3.5 text-slate-300 mr-2" />
-              <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedEnd} onChange={(e) => setStagedEnd(e.target.value)} onKeyDown={handleKeyDown} />
+            <div className={`flex-1 relative flex items-center bg-white dark:bg-slate-800 rounded-lg md:rounded-xl px-3 py-2 border transition-colors ${stagedEnd !== activeEnd ? 'border-indigo-400 ring-1 ring-indigo-400/20' : 'border-slate-200 dark:border-slate-700'}`}>
+              <div className="flex flex-col w-full">
+                <span className="text-[8px] font-black text-slate-400 uppercase tracking-tighter mb-0.5">{t.endDate}</span>
+                <div className="flex items-center">
+                  <CalendarIcon className="w-3.5 h-3.5 text-slate-300 mr-2 shrink-0" />
+                  <input type="date" className="bg-transparent border-none text-[10px] md:text-xs font-bold text-slate-700 dark:text-slate-200 outline-none w-full" value={stagedEnd} onChange={(e) => setStagedEnd(e.target.value)} onKeyDown={handleKeyDown} />
+                </div>
+              </div>
             </div>
           </div>
-          <div className="lg:col-span-3 flex items-end gap-2 md:gap-3 h-full">
+          <div className="lg:col-span-3 flex items-end gap-2 md:gap-3 h-full pt-2 lg:pt-0">
             <button 
               type="button"
               onClick={(e) => handleApplyFilters(e)} 
-              className={`flex-1 flex items-center justify-center gap-2 font-bold text-xs md:text-sm py-2.5 md:py-3 rounded-xl md:rounded-2xl transition-all shadow-lg active:scale-95 ${hasPendingFilters ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'}`}
+              className={`flex-1 flex items-center justify-center gap-2 font-bold text-xs md:text-sm py-2.5 md:py-3.5 rounded-xl md:rounded-2xl transition-all shadow-lg active:scale-95 ${hasPendingFilters ? 'bg-indigo-600 text-white hover:bg-indigo-700' : 'bg-slate-100 dark:bg-slate-800 text-slate-400 cursor-default'}`}
             >
               <Filter className="w-3.5 md:w-4 h-3.5 md:h-4" />
               {t.applyFilters}
             </button>
-            <button type="button" onClick={clearFilters} className="p-2.5 md:p-3 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl md:rounded-2xl transition-all border border-slate-200 dark:border-slate-700">
+            <button type="button" onClick={clearFilters} className="p-2.5 md:p-3.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl md:rounded-2xl transition-all border border-slate-200 dark:border-slate-700">
               <X className="w-4 md:w-5 h-4 md:h-5" />
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 pt-2">
+        <div className="flex flex-wrap items-center justify-between gap-3 pt-4 border-t border-slate-50 dark:border-slate-800/50">
           <div className="flex gap-2 md:gap-3">
-             <button onClick={() => window.print()} className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px] md:text-xs hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-all"><Printer className="w-3 md:w-3.5 h-3 md:h-3.5" />{t.printReport}</button>
-             <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 text-white font-bold text-[10px] md:text-xs hover:bg-emerald-700 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-all"><FileSpreadsheet className="w-3 md:w-3.5 h-3 md:h-3.5" />{t.exportExcel}</button>
+             <button onClick={() => window.print()} className="flex items-center gap-2 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold text-[10px] md:text-xs hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-all shadow-sm"><Printer className="w-3 md:w-3.5 h-3 md:h-3.5" />{t.printReport}</button>
+             <button onClick={exportToExcel} className="flex items-center gap-2 bg-emerald-600 text-white font-bold text-[10px] md:text-xs hover:bg-emerald-700 px-3 md:px-5 py-2 md:py-2.5 rounded-lg md:rounded-xl transition-all shadow-md active:scale-95"><FileSpreadsheet className="w-3 md:w-3.5 h-3 md:h-3.5" />{t.exportExcel}</button>
           </div>
-          {hasPendingFilters && <p className="text-[10px] font-bold text-indigo-500 animate-pulse uppercase tracking-tighter">* Changes pending apply</p>}
+          <div className="flex items-center gap-3">
+             {hasPendingFilters && (
+               <div className="flex items-center gap-1.5 text-[9px] font-black text-indigo-500 animate-pulse uppercase tracking-tight bg-indigo-50 dark:bg-indigo-900/20 px-2 py-1 rounded-md">
+                 <AlertCircle className="w-3 h-3" />
+                 Apply pending
+               </div>
+             )}
+             <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest bg-slate-50 dark:bg-slate-800/40 px-3 py-1.5 rounded-lg">
+                <LayoutList className="w-3 h-3" />
+                <span>Showing {sortedFiltered.length} records</span>
+             </div>
+          </div>
         </div>
       </div>
 
