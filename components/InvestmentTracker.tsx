@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction } from '../types';
-import { TrendingUp, Target, Calculator, Info, Calendar, ChevronDown, ArrowUpRight, BarChart4, Wallet, Save } from 'lucide-react';
+import { TrendingUp, Target, Calculator, Info, Calendar, ChevronDown, ArrowUpRight, BarChart4, Wallet, Save, RotateCcw } from 'lucide-react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 
 interface InvestmentTrackerProps {
@@ -45,6 +45,18 @@ const InvestmentTracker: React.FC<InvestmentTrackerProps> = ({ t, formatCurrency
     };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
   }, [principal, contributionAmount, contributionFrequency, annualRate, years, compoundingFreq]);
+
+  const handleReset = () => {
+    if (window.confirm("Reset calculator to default values?")) {
+      localStorage.removeItem(STORAGE_KEY);
+      setPrincipal(currentTotalInvested || 10000);
+      setContributionAmount(1000);
+      setContributionFrequency('monthly');
+      setAnnualRate(8);
+      setYears(10);
+      setCompoundingFreq(12);
+    }
+  };
 
   const projectionData = useMemo(() => {
     const data = [];
@@ -130,9 +142,19 @@ const InvestmentTracker: React.FC<InvestmentTrackerProps> = ({ t, formatCurrency
             }}
           >
             <div className="space-y-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Calculator className="w-4 h-4 text-teal-500" />
-                <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Projection Settings</h3>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Calculator className="w-4 h-4 text-teal-500" />
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest">Projection Settings</h3>
+                </div>
+                <button 
+                  onClick={handleReset}
+                  className="flex items-center gap-1.5 px-2 py-1 text-[9px] font-black text-slate-400 hover:text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-lg uppercase tracking-wider transition-all"
+                  title="Reset to default values"
+                >
+                  <RotateCcw className="w-3 h-3" />
+                  Reset
+                </button>
               </div>
 
               {/* Principal Input */}
