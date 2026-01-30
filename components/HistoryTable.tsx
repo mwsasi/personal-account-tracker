@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useCallback } from 'react';
 import { Transaction, MonthlyBudget } from '../types';
 import { Edit2, Trash2, FileSpreadsheet, Printer, Search, X, Calendar as CalendarIcon, Filter, PieChart, AlertCircle, TrendingDown } from 'lucide-react';
@@ -24,7 +23,6 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
   const [activeStart, setActiveStart] = useState('');
   const [activeEnd, setActiveEnd] = useState('');
 
-  // Explicitly apply filters to force state update and re-memoization
   const handleApplyFilters = useCallback((e?: React.MouseEvent) => {
     if (e) {
       e.preventDefault();
@@ -39,16 +37,12 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
 
   const filteredTransactions = useMemo(() => {
     const lowerSearch = activeSearch.toLowerCase().trim();
-    
-    // Switch to allTransactions if any filter is active
     const source = (activeSearch || activeStart || activeEnd) ? allTransactions : transactions;
     
     return source.filter(tx => {
-      // Date range filtering
       if (activeStart && tx.date < activeStart) return false;
       if (activeEnd && tx.date > activeEnd) return false;
       
-      // Text search filtering
       if (lowerSearch) {
         const formattedDate = tx.date.split('-').reverse().join('/');
         const dateMatch = tx.date.includes(lowerSearch) || formattedDate.includes(lowerSearch);
@@ -63,6 +57,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
           { key: 'electricity', label: t.electricity },
           { key: 'water', label: t.water },
           { key: 'travel', label: t.travel },
+          { key: 'compoundInvestment', label: t.compoundInvestment },
           { key: 'others', label: t.others },
         ];
         
@@ -71,7 +66,6 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
         );
         if (matchesCategory) return true;
         
-        // Match numbers including .00 precision
         const totalExpStr = Number(tx.totalExpenses).toFixed(2);
         const dailyCashStr = Number(tx.dailyCash).toFixed(2);
         const totalBalStr = Number(tx.totalBalance).toFixed(2);
@@ -103,7 +97,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
     const startBF = Number(firstTx.broughtForward) || 0;
     const endBalance = startBF + totalIncome - totalExpenses;
     
-    const catKeys = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
+    const catKeys = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
     const catTotals: Record<string, { actual: number, limit: number }> = {};
     
     const monthsInView = new Set(sortedFiltered.map(tx => tx.month));
@@ -153,6 +147,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
       [t.electricity]: Number(tx.electricity).toFixed(2),
       [t.water]: Number(tx.water).toFixed(2),
       [t.travel]: Number(tx.travel).toFixed(2),
+      [t.compoundInvestment]: Number(tx.compoundInvestment).toFixed(2),
       [t.others]: Number(tx.others).toFixed(2),
       [t.totalExpenses]: Number(tx.totalExpenses).toFixed(2),
       [t.totalBalance]: Number(tx.totalBalance).toFixed(2),
@@ -199,7 +194,6 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
 
   return (
     <div className="flex flex-col">
-      {/* Dynamic Summary Section */}
       {summary && (
         <div className="p-4 md:p-6 bg-slate-50 dark:bg-slate-800/50 border-b border-slate-100 dark:border-slate-800 transition-colors">
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 mb-4 md:mb-6">
@@ -265,7 +259,6 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
         </div>
       )}
 
-      {/* Filters Toolbar */}
       <div className="p-4 md:p-6 border-b border-slate-100 dark:border-slate-800 space-y-4 no-print transition-colors">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 lg:gap-6">
           <div className="lg:col-span-4 relative group">
@@ -313,9 +306,8 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
         </div>
       </div>
 
-      {/* Records Table */}
       <div className="overflow-x-auto">
-        <table className="w-full text-left min-w-[1400px] border-collapse">
+        <table className="w-full text-left min-w-[1500px] border-collapse">
           <thead>
             <tr className="bg-slate-50 dark:bg-slate-800/50 text-slate-500 dark:text-slate-400 text-[10px] uppercase font-black tracking-widest border-b border-slate-200 dark:border-slate-800">
               <th className="px-6 py-4">{t.date}</th>
@@ -329,6 +321,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
               <th className="px-4 py-4">{t.electricity}</th>
               <th className="px-4 py-4">{t.water}</th>
               <th className="px-4 py-4">{t.travel}</th>
+              <th className="px-4 py-4">{t.compoundInvestment}</th>
               <th className="px-4 py-4">{t.others}</th>
               <th className="px-6 py-4">{t.totalExpenses}</th>
               <th className="px-6 py-4 bg-indigo-50/30 dark:bg-indigo-900/10 text-indigo-700 dark:text-indigo-400">{t.totalBalance}</th>
@@ -349,6 +342,7 @@ const HistoryTable: React.FC<HistoryTableProps> = ({ t, transactions, allTransac
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.electricity || 0))}</td>
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.water || 0))}</td>
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.travel || 0))}</td>
+                <td className="px-4 py-4 font-bold text-teal-600 dark:text-teal-400">{formatCurrency(Number(tx.compoundInvestment || 0))}</td>
                 <td className="px-4 py-4 text-slate-600 dark:text-slate-400">{formatCurrency(Number(tx.others || 0))}</td>
                 <td className="px-6 py-4 font-bold text-rose-500 dark:text-rose-400">{formatCurrency(Number(tx.totalExpenses))}</td>
                 <td className="px-6 py-4 font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50/20 dark:bg-indigo-900/5">{formatCurrency(Number(tx.totalBalance))}</td>

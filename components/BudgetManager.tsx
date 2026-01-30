@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { MonthlyBudget } from '../types';
 
@@ -34,6 +33,7 @@ const BudgetManager: React.FC<BudgetManagerProps> = ({ t, month, initialLimits, 
     { name: 'electricity', label: t.electricity },
     { name: 'water', label: t.water },
     { name: 'travel', label: t.travel },
+    { name: 'compoundInvestment', label: t.compoundInvestment },
     { name: 'others', label: t.others },
   ];
 

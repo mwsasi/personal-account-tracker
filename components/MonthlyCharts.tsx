@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Transaction } from '../types';
 import { 
@@ -11,7 +10,7 @@ interface MonthlyChartsProps {
   transactions: Transaction[];
 }
 
-const COLORS = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#f97316', '#3b82f6'];
+const COLORS = ['#6366f1', '#10b981', '#f43f5e', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899', '#14b8a6', '#f97316', '#3b82f6'];
 
 const MonthlyCharts: React.FC<MonthlyChartsProps> = ({ t, transactions }) => {
   const isDark = document.documentElement.classList.contains('dark');
@@ -26,6 +25,7 @@ const MonthlyCharts: React.FC<MonthlyChartsProps> = ({ t, transactions }) => {
       { name: t.electricity, value: 0 },
       { name: t.water, value: 0 },
       { name: t.travel, value: 0 },
+      { name: t.compoundInvestment, value: 0 },
       { name: t.others, value: 0 },
     ];
 
@@ -38,7 +38,8 @@ const MonthlyCharts: React.FC<MonthlyChartsProps> = ({ t, transactions }) => {
       data[5].value += tx.electricity || 0;
       data[6].value += tx.water || 0;
       data[7].value += tx.travel || 0;
-      data[8].value += tx.others || 0;
+      data[8].value += tx.compoundInvestment || 0;
+      data[9].value += tx.others || 0;
     });
 
     return data.filter(d => d.value > 0);

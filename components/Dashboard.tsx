@@ -1,4 +1,3 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { Transaction, MonthlyBudget, Notification } from '../types';
 import TransactionForm from './TransactionForm';
@@ -12,7 +11,7 @@ import {
   AlertCircle, Clock, History, BellRing, TriangleAlert, Zap, 
   CheckCircle2, ArrowRightCircle, ShoppingBag, Leaf, Fish, 
   Drumstick, Home, Droplets, Car, PlusCircle, LayoutGrid, CalendarDays,
-  ChevronDown
+  ChevronDown, TrendingUp
 } from 'lucide-react';
 import { storageService } from '../services/googleSheets';
 
@@ -71,12 +70,10 @@ const Dashboard: React.FC<DashboardProps> = ({
     const years = new Set<number>();
     const currentYear = new Date().getFullYear();
     
-    // Always provide a range around the current year to ensure dropdown isn't "empty" or "disabled"
     for (let i = currentYear - 5; i <= currentYear + 2; i++) {
       years.add(i);
     }
 
-    // Add any years found in historical data
     transactions.forEach(tx => {
       const d = new Date(tx.date);
       if (!isNaN(d.getTime())) {
@@ -92,7 +89,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const activeBudget = useMemo(() => {
     return budgets.find(b => b.month === selectedMonthKey) || {
       month: selectedMonthKey,
-      limits: { groceries: 0, vegetables: 0, fishEgg: 0, chicken: 0, houseRent: 0, electricity: 0, water: 0, travel: 0, others: 0 }
+      limits: { groceries: 0, vegetables: 0, fishEgg: 0, chicken: 0, houseRent: 0, electricity: 0, water: 0, travel: 0, compoundInvestment: 0, others: 0 }
     };
   }, [budgets, selectedMonthKey]);
 
@@ -112,6 +109,7 @@ const Dashboard: React.FC<DashboardProps> = ({
       { key: 'electricity', label: t.electricity, icon: Zap, color: 'text-yellow-500', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
       { key: 'water', label: t.water, icon: Droplets, color: 'text-cyan-500', bg: 'bg-cyan-50 dark:bg-cyan-900/20' },
       { key: 'travel', label: t.travel, icon: Car, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+      { key: 'compoundInvestment', label: t.compoundInvestment, icon: TrendingUp, color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/20' },
       { key: 'others', label: t.others, icon: PlusCircle, color: 'text-slate-500', bg: 'bg-slate-50 dark:bg-slate-800/50' },
     ];
 
@@ -170,7 +168,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4 bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm no-print transition-colors">
         <div className="flex flex-wrap items-center gap-4 w-full lg:w-auto">
-          {/* Year Dropdown */}
           <label 
             htmlFor="year-selector" 
             className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-2xl min-w-[140px] flex-1 sm:flex-none cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50 group"
@@ -194,7 +191,6 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           </label>
 
-          {/* Month Dropdown */}
           <label 
             htmlFor="month-selector"
             className="flex items-center gap-3 bg-slate-100 dark:bg-slate-800 px-4 py-2 rounded-2xl min-w-[160px] flex-1 sm:flex-none cursor-pointer hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-all border border-transparent hover:border-indigo-100 dark:hover:border-indigo-900/50 group"
@@ -239,7 +235,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       {activeTab === 'dashboard' && (
         <>
-          {/* Enhanced Budget Watch Banner */}
           {budgetHealth.length > 0 && (
             <div className="animate-in slide-in-from-top-4 duration-500">
               <div className="bg-white dark:bg-slate-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-slate-800 relative overflow-hidden transition-colors">
@@ -252,7 +247,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <div>
                       <h3 className="text-xs font-black text-slate-800 dark:text-slate-100 uppercase tracking-tight">Budget Attention</h3>
                       <div className="flex flex-wrap gap-1 mt-0.5">
-                        {budgetHealth.slice(0, 2).map((h, i) => (
+                        {budgetHealth.slice(0, 3).map((h, i) => (
                           <span key={i} className={`text-[8px] font-bold px-1.5 py-0.5 rounded-full ${h.status === 'over' ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/40' : 'bg-amber-100 text-amber-600 dark:bg-amber-900/40'}`}>
                             {h.label}: {h.percentage.toFixed(0)}%
                           </span>
@@ -274,7 +269,6 @@ const Dashboard: React.FC<DashboardProps> = ({
 
           <StatsOverview t={t} stats={filteredStats} formatCurrency={formatCurrency} />
 
-          {/* Enhanced: Category Quick-View Summary with Budget Values */}
           <div className="mt-6 space-y-3">
             <div className="flex items-center gap-2">
               <LayoutGrid className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />

@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect } from 'react';
 import { Transaction } from '../types';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, RefreshCw, BadgeAlert } from 'lucide-react';
 
 interface TransactionFormProps {
   t: any;
@@ -22,21 +21,17 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
     electricity: '' as any,
     water: '' as any,
     travel: '' as any,
+    compoundInvestment: '' as any,
     others: '' as any,
     dailyCash: '' as any,
     broughtForward: '' as any,
   });
 
   const [dateError, setDateError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
 
-  /**
-   * REACTION LOGIC
-   * This effect ensures that the "Brought Forward" field is always accurate to the selected calendar date.
-   * If jumping to an older date or a missing date, the form will suggest the closing balance of the day immediately prior.
-   */
   useEffect(() => {
     if (initialData) {
-      // EDIT MODE: Use the values exactly as they are currently stored in the specific record.
       setFormData({
         date: initialData.date,
         groceries: initialData.groceries || '',
@@ -47,18 +42,19 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
         electricity: initialData.electricity || '',
         water: initialData.water || '',
         travel: initialData.travel || '',
+        compoundInvestment: initialData.compoundInvestment || '',
         others: initialData.others || '',
         dailyCash: initialData.dailyCash || '',
         broughtForward: initialData.broughtForward,
       });
     } else {
-      // ADD MODE: Automatically determine the opening Stock/Balance based on the selected date.
-      // Jumping to any date in the calendar will fetch the correct 'final total balance' of its predecessor.
+      setIsSyncing(true);
       const bf = getStartingBalance(formData.date);
       setFormData(prev => ({
         ...prev,
         broughtForward: Number(bf) || 0
       }));
+      setTimeout(() => setIsSyncing(false), 400);
     }
   }, [initialData, getStartingBalance, formData.date]);
 
@@ -81,9 +77,14 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
     const { name, value, type } = e.target;
     if (name === 'date') validateDate(value);
     
+    let val = value;
+    if (type === 'number' && Number(value) < 0) {
+      val = '0';
+    }
+
     setFormData(prev => ({
       ...prev,
-      [name]: type === 'number' ? (value === '' ? '' : Number(value)) : value
+      [name]: type === 'number' ? (val === '' ? '' : Number(val)) : val
     }));
   };
 
@@ -101,6 +102,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
     val(formData.electricity) +
     val(formData.water) +
     val(formData.travel) +
+    val(formData.compoundInvestment) +
     val(formData.others);
 
   const totalBalance = val(formData.broughtForward) + val(formData.dailyCash) - totalExpenses;
@@ -122,6 +124,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
       electricity: val(formData.electricity),
       water: val(formData.water),
       travel: val(formData.travel),
+      compoundInvestment: val(formData.compoundInvestment),
       others: val(formData.others),
       dailyCash: val(formData.dailyCash),
       broughtForward: val(formData.broughtForward),
@@ -142,7 +145,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
               type="date"
               name="date"
               required
-              className={`w-full px-4 py-3 rounded-2xl border ${dateError ? 'border-rose-500 ring-1 ring-rose-500' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-sm`}
+              className={`w-full px-4 py-3 rounded-2xl border ${dateError ? 'border-rose-500 ring-2 ring-rose-500/20' : 'border-slate-200 dark:border-slate-700'} bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-bold text-sm`}
               value={formData.date}
               onChange={handleChange}
             />
@@ -154,16 +157,29 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
             )}
           </div>
           <div className="space-y-1">
-            <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1 mb-1">{t.broughtForward}</label>
-            <input
-              type="number"
-              name="broughtForward"
-              placeholder="0"
-              className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm"
-              value={formData.broughtForward === '' ? '' : formData.broughtForward}
-              onChange={handleChange}
-            />
-            <p className="text-[9px] font-black text-slate-400 uppercase tracking-tighter pl-1 mt-1">Suggested from account history</p>
+            <label className="block text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest pl-1 mb-1">
+              {t.broughtForward}
+            </label>
+            <div className="relative group">
+              <input
+                type="number"
+                name="broughtForward"
+                placeholder="0"
+                className={`w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-indigo-600 dark:text-indigo-400 transition-all focus:ring-2 focus:ring-indigo-500 outline-none font-black text-sm ${isSyncing ? 'animate-pulse' : ''}`}
+                value={formData.broughtForward === '' ? '' : formData.broughtForward}
+                onChange={handleChange}
+              />
+              <div className="flex items-center gap-1 mt-1 pl-1">
+                {isSyncing ? (
+                  <RefreshCw className="w-2.5 h-2.5 text-indigo-400 animate-spin" />
+                ) : (
+                  <BadgeAlert className="w-2.5 h-2.5 text-slate-300" />
+                )}
+                <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-tighter">
+                  {isSyncing ? 'Recalculating sequence...' : 'Synced from previous day'}
+                </p>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -174,6 +190,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
               type="number"
               name="dailyCash"
               placeholder="0"
+              min="0"
               className="w-full px-4 py-3 rounded-2xl border border-emerald-100 dark:border-emerald-900 bg-emerald-50/30 dark:bg-emerald-900/10 font-black text-emerald-800 dark:text-emerald-200 transition-all focus:ring-2 focus:ring-emerald-500 outline-none"
               value={formData.dailyCash === '' ? '' : formData.dailyCash}
               onChange={handleChange}
@@ -188,6 +205,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
             { name: 'electricity', label: t.electricity },
             { name: 'water', label: t.water },
             { name: 'travel', label: t.travel },
+            { name: 'compoundInvestment', label: t.compoundInvestment },
             { name: 'others', label: t.others },
           ].map(field => (
             <div key={field.name}>
@@ -196,6 +214,7 @@ const TransactionForm: React.FC<TransactionFormProps> = ({ t, initialData, getSt
                 type="number"
                 name={field.name}
                 placeholder="0"
+                min="0"
                 className="w-full px-4 py-3 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:ring-2 focus:ring-indigo-500 outline-none font-bold text-sm"
                 value={(formData as any)[field.name] === '' ? '' : (formData as any)[field.name]}
                 onChange={handleChange}

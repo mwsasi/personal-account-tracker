@@ -7,8 +7,14 @@ import Dashboard from './components/Dashboard';
 import SettingsPage from './components/SettingsPage';
 import NotificationDrawer from './components/NotificationDrawer';
 import BillManager from './components/BillManager';
+import InvestmentTracker from './components/InvestmentTracker';
 import AuthForm from './components/AuthForm';
-import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw } from 'lucide-react';
+import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw, AlertCircle, CheckCircle2, TrendingUp } from 'lucide-react';
+
+interface ToastState {
+  message: string;
+  type: 'success' | 'error' | 'info';
+}
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{name: string, email: string} | null>(() => {
@@ -18,17 +24,25 @@ const App: React.FC = () => {
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('lang') as Language) || 'en');
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'history' | 'budget' | 'settings' | 'bills'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'analytics' | 'history' | 'budget' | 'settings' | 'bills' | 'investments'>('dashboard');
   const [isLoading, setIsLoading] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [currencySettings, setCurrencySettings] = useState<CurrencySettings>(() => {
     const saved = localStorage.getItem('currency_settings');
     return saved ? JSON.parse(saved) : { symbol: 'Rs', position: 'before' };
   });
 
   const t = translations[lang];
+
+  useEffect(() => {
+    if (toast) {
+      const timer = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast]);
 
   useEffect(() => {
     localStorage.setItem('lang', lang);
@@ -44,6 +58,10 @@ const App: React.FC = () => {
     }
   }, [isDark]);
 
+  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+  };
+
   const handleLogout = () => {
     if (window.confirm(t.logout + "?")) {
       localStorage.removeItem('finance_user');
@@ -52,15 +70,25 @@ const App: React.FC = () => {
   };
 
   const handleLogin = async (email: string, pass: string) => {
-    const dummyUser = { name: email.split('@')[0], email };
-    localStorage.setItem('finance_user', JSON.stringify(dummyUser));
-    setUser(dummyUser);
+    try {
+      const dummyUser = { name: email.split('@')[0], email };
+      localStorage.setItem('finance_user', JSON.stringify(dummyUser));
+      setUser(dummyUser);
+      showToast(t.welcomeBack, 'success');
+    } catch (err) {
+      showToast(t.authError, 'error');
+    }
   };
 
   const handleRegister = async (name: string, email: string, pass: string) => {
-    const dummyUser = { name, email };
-    localStorage.setItem('finance_user', JSON.stringify(dummyUser));
-    setUser(dummyUser);
+    try {
+      const dummyUser = { name, email };
+      localStorage.setItem('finance_user', JSON.stringify(dummyUser));
+      setUser(dummyUser);
+      showToast(t.settingsSaved, 'success');
+    } catch (err) {
+      showToast(t.authError, 'error');
+    }
   };
 
   const formatCurrency = useCallback((amount: number) => {
@@ -73,28 +101,19 @@ const App: React.FC = () => {
       : `${formattedAmount} ${currencySettings.symbol}`;
   }, [currencySettings]);
 
-  /**
-   * RECALCULATE CHAIN
-   * This is the core integrity function. It ensures that every record's "Brought Forward"
-   * is strictly the "Total Balance" of the chronologically previous record.
-   * This propagates changes across the entire history when any record is edited or inserted.
-   */
   const recalculateChain = useCallback((txs: Transaction[]) => {
     if (txs.length === 0) return [];
     
-    // Sort primarily by calendar date, then by entry timestamp
     const sorted = [...txs].sort((a, b) => {
       const dateDiff = a.date.localeCompare(b.date);
       if (dateDiff !== 0) return dateDiff;
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
+    const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
 
     let runningBalance = 0;
     return sorted.map((tx, index) => {
-      // The absolute first entry in the database defines the starting BF.
-      // Every subsequent record is forced to follow the running balance of history.
       const bf = index === 0 ? Number(tx.broughtForward || 0) : runningBalance;
       const income = Number(tx.dailyCash || 0);
       const expense = categories.reduce((sum, cat) => sum + (Number((tx as any)[cat]) || 0), 0);
@@ -111,90 +130,81 @@ const App: React.FC = () => {
     });
   }, []);
 
-  /**
-   * GET STARTING BALANCE
-   * Used by the Transaction Form to suggest the opening balance for a specific date.
-   * It finds the closing balance (Total Balance) of the immediately preceding record in history.
-   */
   const getStartingBalance = useCallback((targetDate: string) => {
     if (!transactions || transactions.length === 0) return 0;
     
-    // Sort transactions chronologically
     const sorted = [...transactions].sort((a, b) => {
       const dateDiff = a.date.localeCompare(b.date);
       if (dateDiff !== 0) return dateDiff;
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    // Case 1: If a record already exists for this date, return its current BF (useful for merges)
     const sameDayEntry = sorted.find(tx => tx.date === targetDate);
     if (sameDayEntry) return Number(sameDayEntry.broughtForward || 0);
     
-    // Case 2: Find the record with the latest date BEFORE the target date
     const lastValidEntry = [...sorted].reverse().find(tx => tx.date < targetDate);
     
-    // Return the closing balance of that preceding day
     if (lastValidEntry) return Number(lastValidEntry.totalBalance || 0);
-    
-    // Case 3: Earliest record or empty
     return 0;
   }, [transactions]);
 
   const generateNotifications = useCallback(async (txs: Transaction[]) => {
-    const budgets = await storageService.fetchBudgets();
-    const bills = await storageService.fetchBills();
-    const now = new Date();
-    const currentMonthLabel = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
-    const currentMonthTxs = txs.filter(tx => tx.month === currentMonthLabel);
-    const budget = budgets.find(b => b.month === currentMonthLabel);
-    const newNotifications: Notification[] = [];
+    try {
+      const budgets = await storageService.fetchBudgets();
+      const bills = await storageService.fetchBills();
+      const now = new Date();
+      const currentMonthLabel = now.toLocaleString('en-US', { month: 'long', year: 'numeric' });
+      const currentMonthTxs = txs.filter(tx => tx.month === currentMonthLabel);
+      const budget = budgets.find(b => b.month === currentMonthLabel);
+      const newNotifications: Notification[] = [];
 
-    if (budget) {
-      const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
-      categories.forEach(cat => {
-        const limit = (budget.limits as any)[cat];
-        const spent = currentMonthTxs.reduce((sum, tx) => sum + ((tx as any)[cat] || 0), 0);
-        if (limit > 0 && spent / limit >= 0.85) {
+      if (budget) {
+        const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
+        categories.forEach(cat => {
+          const limit = (budget.limits as any)[cat];
+          const spent = currentMonthTxs.reduce((sum, tx) => sum + (Number((tx as any)[cat]) || 0), 0);
+          if (limit > 0 && spent / limit >= 0.85) {
+            newNotifications.push({
+              id: `budget-${cat}-${currentMonthLabel}`,
+              type: 'budget',
+              title: t.lowBudgetAlert,
+              message: t.lowBudgetMsg.replace('{percent}', Math.round((spent/limit)*100).toString()).replace('{category}', (t as any)[cat]),
+              timestamp: now.toISOString(),
+              read: false,
+              priority: spent >= limit ? 'high' : 'medium'
+            });
+          }
+        });
+      }
+
+      bills.forEach(bill => {
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        let dueDate = new Date(now.getFullYear(), now.getMonth(), bill.dueDay);
+        if (dueDate < today) dueDate = new Date(now.getFullYear(), now.getMonth() + 1, bill.dueDay);
+        const diffTime = dueDate.getTime() - today.getTime();
+        const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        if (daysLeft >= 0 && daysLeft <= 7) {
           newNotifications.push({
-            id: `budget-${cat}-${currentMonthLabel}`,
-            type: 'budget',
-            title: t.lowBudgetAlert,
-            message: t.lowBudgetMsg.replace('{percent}', Math.round((spent/limit)*100).toString()).replace('{category}', (t as any)[cat]),
+            id: `bill-${bill.id}-${dueDate.toISOString().split('T')[0]}`,
+            type: 'bill',
+            title: bill.name,
+            message: daysLeft === 0 ? t.dueToday : t.billDueIn.replace('{days}', daysLeft.toString()),
             timestamp: now.toISOString(),
             read: false,
-            priority: spent >= limit ? 'high' : 'medium'
+            priority: daysLeft === 0 ? 'high' : (daysLeft <= 3 ? 'medium' : 'low')
           });
         }
       });
+
+      setNotifications(prev => {
+        const existingIds = new Set(prev.map(n => n.id));
+        const added = newNotifications.filter(n => !existingIds.has(n.id));
+        return [...added, ...prev].slice(0, 30);
+      });
+    } catch (e) {
+      console.error("Notification sync failed", e);
     }
-
-    bills.forEach(bill => {
-      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-      let dueDate = new Date(now.getFullYear(), now.getMonth(), bill.dueDay);
-      if (dueDate < today) {
-        dueDate = new Date(now.getFullYear(), now.getMonth() + 1, bill.dueDay);
-      }
-      const diffTime = dueDate.getTime() - today.getTime();
-      const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      if (daysLeft >= 0 && daysLeft <= 7) {
-        newNotifications.push({
-          id: `bill-${bill.id}-${dueDate.toISOString().split('T')[0]}`,
-          type: 'bill',
-          title: bill.name,
-          message: daysLeft === 0 ? t.dueToday : t.billDueIn.replace('{days}', daysLeft.toString()),
-          timestamp: now.toISOString(),
-          read: false,
-          priority: daysLeft === 0 ? 'high' : (daysLeft <= 3 ? 'medium' : 'low')
-        });
-      }
-    });
-
-    setNotifications(prev => {
-      const existingIds = new Set(prev.map(n => n.id));
-      const added = newNotifications.filter(n => !existingIds.has(n.id));
-      return [...added, ...prev].slice(0, 30);
-    });
   }, [t]);
 
   const loadData = useCallback(async () => {
@@ -205,7 +215,7 @@ const App: React.FC = () => {
       setTransactions(rebalanced);
       await generateNotifications(rebalanced);
     } catch (err) {
-      console.error("Failed to load data", err);
+      showToast("Data loading error. Local storage might be full.", 'error');
     } finally {
       setIsLoading(false);
     }
@@ -213,58 +223,70 @@ const App: React.FC = () => {
 
   const onAddTransaction = useCallback(async (data: Transaction) => {
     setIsSyncing(true);
-    // Fetch fresh copy to avoid race conditions with local state
-    const freshTransactions = await storageService.fetchTransactions();
-    const existingIndex = freshTransactions.findIndex(tx => tx.date === data.date);
-    
-    let newList;
-    if (existingIndex !== -1) {
-      // If adding a record for a date that already exists, MERGE the amounts
-      const existing = freshTransactions[existingIndex];
-      const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
-      const merged: Transaction = {
-        ...existing,
-        dailyCash: Number(existing.dailyCash || 0) + Number(data.dailyCash || 0),
-        timestamp: new Date().toISOString() // Update timestamp for chronological priority if same date
-      };
-      categories.forEach(cat => {
-        (merged as any)[cat] = Number((existing as any)[cat] || 0) + Number((data as any)[cat] || 0);
-      });
-      newList = [...freshTransactions];
-      newList[existingIndex] = merged;
-    } else {
-      // Brand new calendar date entry
-      newList = [...freshTransactions, { ...data, id: crypto.randomUUID(), timestamp: new Date().toISOString() }];
+    try {
+      const freshTransactions = await storageService.fetchTransactions();
+      const existingIndex = freshTransactions.findIndex(tx => tx.date === data.date);
+      
+      let newList;
+      if (existingIndex !== -1) {
+        const existing = freshTransactions[existingIndex];
+        const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'compoundInvestment', 'others'];
+        const merged: Transaction = {
+          ...existing,
+          dailyCash: Number(existing.dailyCash || 0) + Number(data.dailyCash || 0),
+          timestamp: new Date().toISOString()
+        };
+        categories.forEach(cat => {
+          (merged as any)[cat] = Number((existing as any)[cat] || 0) + Number((data as any)[cat] || 0);
+        });
+        newList = [...freshTransactions];
+        newList[existingIndex] = merged;
+      } else {
+        newList = [...freshTransactions, { ...data, id: crypto.randomUUID(), timestamp: new Date().toISOString() }];
+      }
+      
+      const rebalanced = recalculateChain(newList);
+      await storageService.saveAllTransactions(rebalanced);
+      await loadData();
+      showToast(t.saveSettings, 'success');
+    } catch (err) {
+      showToast("Could not save transaction.", 'error');
+    } finally {
+      setIsSyncing(false);
     }
-    
-    // CRITICAL: Re-propagate all balances across history to ensure the new data correctly shifts future records
-    const rebalanced = recalculateChain(newList);
-    await storageService.saveAllTransactions(rebalanced);
-    await loadData();
-    setIsSyncing(false);
-  }, [loadData, recalculateChain]);
+  }, [loadData, recalculateChain, t.saveSettings]);
 
   const onUpdateTransaction = useCallback(async (id: string, data: Transaction) => {
     setIsSyncing(true);
-    const freshTransactions = await storageService.fetchTransactions();
-    const updatedList = freshTransactions.map(tx => tx.id === id ? { ...data, id } : tx);
-    // CRITICAL: Re-propagate balances in case this edit changed the closing balance of this day
-    const rebalanced = recalculateChain(updatedList);
-    await storageService.saveAllTransactions(rebalanced);
-    await loadData();
-    setIsSyncing(false);
+    try {
+      const freshTransactions = await storageService.fetchTransactions();
+      const updatedList = freshTransactions.map(tx => tx.id === id ? { ...data, id } : tx);
+      const rebalanced = recalculateChain(updatedList);
+      await storageService.saveAllTransactions(rebalanced);
+      await loadData();
+      showToast("Updated successfully", 'success');
+    } catch (err) {
+      showToast("Update failed", 'error');
+    } finally {
+      setIsSyncing(false);
+    }
   }, [loadData, recalculateChain]);
 
   const onDeleteTransaction = useCallback(async (id: string) => {
     if (window.confirm(t.confirmDelete)) {
       setIsSyncing(true);
-      const freshTransactions = await storageService.fetchTransactions();
-      const updatedList = freshTransactions.filter(tx => tx.id !== id);
-      // CRITICAL: Re-propagate balances because removing a day changes the starting point for all next days
-      const rebalanced = recalculateChain(updatedList);
-      await storageService.saveAllTransactions(rebalanced);
-      await loadData();
-      setIsSyncing(false);
+      try {
+        const freshTransactions = await storageService.fetchTransactions();
+        const updatedList = freshTransactions.filter(tx => tx.id !== id);
+        const rebalanced = recalculateChain(updatedList);
+        await storageService.saveAllTransactions(rebalanced);
+        await loadData();
+        showToast("Deleted successfully", 'success');
+      } catch (err) {
+        showToast("Delete failed", 'error');
+      } finally {
+        setIsSyncing(false);
+      }
     }
   }, [loadData, t.confirmDelete, recalculateChain]);
 
@@ -279,6 +301,7 @@ const App: React.FC = () => {
   const navItems = [
     { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard },
     { id: 'analytics', label: t.charts, icon: BarChart3 },
+    { id: 'investments', label: t.investments, icon: TrendingUp },
     { id: 'budget', label: t.budget, icon: Target },
     { id: 'bills', label: t.bills, icon: CreditCard },
     { id: 'history', label: t.history, icon: History },
@@ -287,6 +310,26 @@ const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 pb-24 md:pb-0 font-sans transition-colors duration-300">
+      {toast && (
+        <div className="fixed bottom-24 md:bottom-8 right-4 md:right-8 z-[100] animate-in slide-in-from-right-8 duration-300">
+          <div className={`px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-4 border ${
+            toast.type === 'success' ? 'bg-emerald-600 border-emerald-500 text-white' : 
+            toast.type === 'error' ? 'bg-rose-600 border-rose-500 text-white' : 
+            'bg-indigo-600 border-indigo-500 text-white'
+          }`}>
+            {toast.type === 'success' ? <CheckCircle2 className="w-5 h-5" /> : <AlertCircle className="w-5 h-5" />}
+            <span className="font-black text-sm uppercase tracking-tight">{toast.message}</span>
+          </div>
+        </div>
+      )}
+
+      {isSyncing && (
+        <div className="fixed top-4 right-4 z-[90] bg-white/90 dark:bg-slate-900/90 backdrop-blur-md px-4 py-2 rounded-2xl border border-indigo-100 dark:border-indigo-900 shadow-xl flex items-center gap-3">
+          <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
+          <span className="text-[10px] font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest">{t.calculating}</span>
+        </div>
+      )}
+
       <nav className="hidden md:flex flex-col fixed h-full w-64 bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 p-6 z-20 no-print transition-colors">
         <div className="flex items-center gap-3 mb-10">
           <div className="p-2 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200 dark:shadow-none">
@@ -323,14 +366,6 @@ const App: React.FC = () => {
           </button>
         </div>
       </nav>
-
-      {/* Syncing Indicator */}
-      {isSyncing && (
-        <div className="fixed top-4 right-4 z-[100] bg-white dark:bg-slate-900 px-4 py-2 rounded-2xl shadow-xl border border-indigo-100 dark:border-indigo-900 flex items-center gap-3 animate-in fade-in slide-in-from-right duration-300">
-          <RefreshCw className="w-4 h-4 text-indigo-500 animate-spin" />
-          <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tighter">{t.calculating}</span>
-        </div>
-      )}
 
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg border-t border-slate-200 dark:border-slate-800 px-2 py-3 z-50 no-print flex justify-around items-center transition-colors">
         {navItems.map(tab => (
@@ -371,11 +406,12 @@ const App: React.FC = () => {
               settings={currencySettings} 
               isDark={isDark}
               onToggleDark={() => setIsDark(!isDark)}
-              onSave={(s) => { setCurrencySettings(s); localStorage.setItem('currency_settings', JSON.stringify(s)); }} 
+              onSave={(s) => { setCurrencySettings(s); localStorage.setItem('currency_settings', JSON.stringify(s)); showToast(t.settingsSaved, 'success'); }} 
             />
           )}
           {activeTab === 'bills' && <BillManager t={t} formatCurrency={formatCurrency} transactions={transactions} onRefresh={loadData} />}
-          {activeTab !== 'settings' && activeTab !== 'bills' && (
+          {activeTab === 'investments' && <InvestmentTracker t={t} formatCurrency={formatCurrency} transactions={transactions} />}
+          {activeTab !== 'settings' && activeTab !== 'bills' && activeTab !== 'investments' && (
             <Dashboard 
               activeTab={activeTab} 
               setActiveTab={setActiveTab}

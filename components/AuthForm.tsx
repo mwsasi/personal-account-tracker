@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Wallet, Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Wallet, Mail, Lock, User, ArrowRight, Loader2, AlertCircle } from 'lucide-react';
 
 interface AuthFormProps {
   t: any;
@@ -14,10 +14,34 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
   const [formData, setFormData] = useState({ name: '', email: '', password: '' });
   const [error, setError] = useState('');
 
+  const validateEmail = (email: string) => {
+    return String(email)
+      .toLowerCase()
+      .match(
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+      );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
+    
+    if (!validateEmail(formData.email)) {
+      setError("Please enter a valid email address");
+      return;
+    }
+
+    if (formData.password.length < 4) {
+      setError("Password must be at least 4 characters");
+      return;
+    }
+
+    if (!isLogin && !formData.name.trim()) {
+      setError("Full name is required");
+      return;
+    }
+
+    setLoading(true);
     try {
       if (isLogin) {
         await onLogin(formData.email, formData.password);
@@ -25,7 +49,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
         await onRegister(formData.name, formData.email, formData.password);
       }
     } catch (err) {
-      setError(t.authError);
+      setError(t.authError || "Authentication failed. Try again.");
     } finally {
       setLoading(false);
     }
@@ -43,6 +67,12 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
         </div>
 
         <div className="bg-white dark:bg-slate-900 p-8 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl shadow-slate-200/50 dark:shadow-none animate-in zoom-in-95 duration-500">
+          {error && (
+            <div className="mb-6 p-4 bg-rose-50 dark:bg-rose-900/20 border border-rose-100 dark:border-rose-900/50 rounded-2xl flex items-center gap-3 text-rose-600 dark:text-rose-400 text-xs font-black uppercase tracking-tight animate-in fade-in slide-in-from-top-2">
+              <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+            </div>
+          )}
+
           <form onSubmit={handleSubmit} className="space-y-5">
             {!isLogin && (
               <div className="space-y-1">
@@ -50,11 +80,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
                 <div className="relative group">
                   <User className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                   <input
-                    required
-                    type="text"
+                    required type="text"
                     className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
-                    placeholder="John Doe"
-                    value={formData.name}
+                    placeholder="John Doe" value={formData.name}
                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   />
                 </div>
@@ -66,11 +94,9 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
               <div className="relative group">
                 <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input
-                  required
-                  type="email"
+                  required type="email"
                   className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
-                  placeholder="name@example.com"
-                  value={formData.email}
+                  placeholder="name@example.com" value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                 />
               </div>
@@ -81,21 +107,16 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
               <div className="relative group">
                 <Lock className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400 group-focus-within:text-indigo-500 transition-colors" />
                 <input
-                  required
-                  type="password"
+                  required type="password"
                   className="w-full pl-12 pr-4 py-3.5 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 focus:ring-2 focus:ring-indigo-500 outline-none transition-all font-semibold"
-                  placeholder="••••••••"
-                  value={formData.password}
+                  placeholder="••••••••" value={formData.password}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
                 />
               </div>
             </div>
 
-            {error && <p className="text-rose-500 text-xs font-bold text-center animate-shake">{error}</p>}
-
             <button
-              disabled={loading}
-              type="submit"
+              disabled={loading} type="submit"
               className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl font-bold shadow-lg shadow-indigo-200 dark:shadow-none transition-all active:scale-[0.98] disabled:opacity-70"
             >
               {loading ? (
@@ -111,7 +132,7 @@ const AuthForm: React.FC<AuthFormProps> = ({ t, onLogin, onRegister }) => {
 
           <div className="mt-8 pt-8 border-t border-slate-100 dark:border-slate-800 text-center">
             <button
-              onClick={() => setIsLogin(!isLogin)}
+              onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="text-sm font-bold text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 transition-colors"
             >
               {isLogin ? t.noAccount : t.hasAccount}

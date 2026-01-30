@@ -11,6 +11,7 @@ export interface Transaction {
   electricity: number;
   water: number;
   travel: number;
+  compoundInvestment: number;
   others: number;
   dailyCash: number;
   broughtForward: number;
@@ -38,6 +39,7 @@ export interface MonthlyBudget {
     electricity: number;
     water: number;
     travel: number;
+    compoundInvestment: number;
     others: number;
   };
 }
@@ -48,7 +50,7 @@ export interface Bill {
   amount: number;
   dueDay: number; // 1-31
   category: string;
-  lastPaidMonth?: string; // New: tracks the last month this bill was paid (e.g., "March 2025")
+  lastPaidMonth?: string; // tracks the last month this bill was paid (e.g., "March 2025")
 }
 
 export interface Notification {
