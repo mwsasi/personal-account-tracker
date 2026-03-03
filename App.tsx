@@ -1,15 +1,16 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Transaction, Language, CurrencySettings, Notification } from './types.ts';
 import { translations } from './translations.ts';
 import { storageService } from './services/googleSheets.ts';
+import { supabase } from './supabaseClient.ts';
 import Dashboard from './components/Dashboard.tsx';
 import SettingsPage from './components/SettingsPage.tsx';
 import NotificationDrawer from './components/NotificationDrawer.tsx';
 import BillManager from './components/BillManager.tsx';
 import InvestmentTracker from './components/InvestmentTracker.tsx';
 import AuthForm from './components/AuthForm.tsx';
-import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw, AlertCircle, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw, AlertCircle, CheckCircle2, TrendingUp, Loader2 } from 'lucide-react';
 
 interface ToastState {
   message: string;
@@ -18,9 +19,14 @@ interface ToastState {
 
 const App: React.FC = () => {
   const [user, setUser] = useState<{name: string, email: string} | null>(() => {
-    const saved = localStorage.getItem('finance_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('finance_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
   });
+  const [isAuthLoading, setIsAuthLoading] = useState(true);
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('lang') as Language) || 'en');
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -36,6 +42,66 @@ const App: React.FC = () => {
   });
 
   const t = translations[lang];
+  const isMounted = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false;
+    };
+  }, []);
+
+  const showToast = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setToast({ message, type });
+  }, []);
+
+  // Helper to update state based on Supabase user
+  const syncUser = useCallback((supabaseUser: any) => {
+    if (!isMounted.current) return;
+    
+    if (supabaseUser) {
+      const userData = { 
+        name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User', 
+        email: supabaseUser.email || '' 
+      };
+      localStorage.setItem('finance_user', JSON.stringify(userData));
+      setUser(userData);
+    } else {
+      localStorage.removeItem('finance_user');
+      setUser(null);
+    }
+    setIsAuthLoading(false);
+  }, []);
+
+  // Centralized Auth Listener
+  useEffect(() => {
+    // Initial check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      syncUser(session?.user ?? null);
+    }).catch(err => {
+      console.error("Session check error:", err);
+      setIsAuthLoading(false);
+    });
+
+    // Subscribe to all auth events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!isMounted.current) return;
+      
+      console.log("Supabase Auth Event:", event);
+      
+      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
+        syncUser(session?.user ?? null);
+        if (event === 'SIGNED_IN') {
+          showToast(t.welcomeBack, 'success');
+        }
+      } else if (event === 'SIGNED_OUT') {
+        syncUser(null);
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [syncUser, t.welcomeBack, showToast]);
 
   useEffect(() => {
     if (toast) {
@@ -58,36 +124,45 @@ const App: React.FC = () => {
     }
   }, [isDark]);
 
-  const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setToast({ message, type });
-  };
-
-  const handleLogout = () => {
+  const handleLogout = async () => {
     if (window.confirm(t.logout + "?")) {
-      localStorage.removeItem('finance_user');
+      // 1. Immediate UI update for responsiveness
       setUser(null);
+      localStorage.removeItem('finance_user');
+      
+      try {
+        // 2. Perform server-side logout
+        await supabase.auth.signOut();
+      } catch (e) {
+        console.error("Logout error (likely already signed out):", e);
+      } finally {
+        showToast("Logged out successfully", 'info');
+      }
     }
   };
 
   const handleLogin = async (email: string, pass: string) => {
-    try {
-      const dummyUser = { name: email.split('@')[0], email };
-      localStorage.setItem('finance_user', JSON.stringify(dummyUser));
-      setUser(dummyUser);
-      showToast(t.welcomeBack, 'success');
-    } catch (err) {
-      showToast(t.authError, 'error');
-    }
+    const { error } = await supabase.auth.signInWithPassword({
+      email,
+      password: pass,
+    });
+    if (error) throw error;
   };
 
   const handleRegister = async (name: string, email: string, pass: string) => {
-    try {
-      const dummyUser = { name, email };
-      localStorage.setItem('finance_user', JSON.stringify(dummyUser));
-      setUser(dummyUser);
-      showToast(t.settingsSaved, 'success');
-    } catch (err) {
-      showToast(t.authError, 'error');
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password: pass,
+      options: {
+        data: {
+          full_name: name,
+        }
+      }
+    });
+    if (error) throw error;
+    
+    if (!data.session) {
+      // Verification required - AuthForm handles this with the success state
     }
   };
 
@@ -110,8 +185,6 @@ const App: React.FC = () => {
       return (a.timestamp || '').localeCompare(b.timestamp || '');
     });
 
-    // NOTE: Parallel log categories (compoundInvestment, fuel, bikeRepair, parcel) 
-    // are EXCLUDED from the expense summation list below.
     const categories = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others'];
 
     let runningBalance = 0;
@@ -217,11 +290,11 @@ const App: React.FC = () => {
       setTransactions(rebalanced);
       await generateNotifications(rebalanced);
     } catch (err) {
-      showToast("Data loading error. Local storage might be full.", 'error');
+      showToast("Data loading error.", 'error');
     } finally {
       setIsLoading(false);
     }
-  }, [generateNotifications, recalculateChain]);
+  }, [generateNotifications, recalculateChain, showToast]);
 
   const onAddTransaction = useCallback(async (data: Transaction) => {
     setIsSyncing(true);
@@ -256,7 +329,7 @@ const App: React.FC = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [loadData, recalculateChain, t.saveSettings]);
+  }, [loadData, recalculateChain, t.saveSettings, showToast]);
 
   const onUpdateTransaction = useCallback(async (id: string, data: Transaction) => {
     setIsSyncing(true);
@@ -272,7 +345,7 @@ const App: React.FC = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [loadData, recalculateChain]);
+  }, [loadData, recalculateChain, showToast]);
 
   const onDeleteTransaction = useCallback(async (id: string) => {
     if (window.confirm(t.confirmDelete)) {
@@ -290,11 +363,21 @@ const App: React.FC = () => {
         setIsSyncing(false);
       }
     }
-  }, [loadData, t.confirmDelete, recalculateChain]);
+  }, [loadData, t.confirmDelete, recalculateChain, showToast]);
 
   useEffect(() => {
     if (user) loadData();
   }, [user, loadData]);
+
+  // Loading Screen for Auth Session Check
+  if (isAuthLoading) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
+        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
+        <p className="text-xs font-black text-slate-400 uppercase tracking-widest animate-pulse">Syncing Session...</p>
+      </div>
+    );
+  }
 
   if (!user) {
     return <AuthForm t={t} onLogin={handleLogin} onRegister={handleRegister} />;
@@ -362,8 +445,8 @@ const App: React.FC = () => {
             <Globe className="w-5 h-5" />
             {t.language}
           </button>
-          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold rounded-xl transition-all mt-4">
-            <LogOut className="w-5 h-5" />
+          <button onClick={handleLogout} className="w-full flex items-center gap-3 px-4 py-3 text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold rounded-xl transition-all mt-4 group">
+            <LogOut className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
             {t.logout}
           </button>
         </div>
@@ -410,6 +493,8 @@ const App: React.FC = () => {
               onToggleDark={() => setIsDark(!isDark)}
               onSave={(s) => { setCurrencySettings(s); localStorage.setItem('currency_settings', JSON.stringify(s)); showToast(t.settingsSaved, 'success'); }} 
               onRefresh={loadData}
+              user={user}
+              onLogout={handleLogout}
             />
           )}
           {activeTab === 'bills' && <BillManager t={t} formatCurrency={formatCurrency} transactions={transactions} onRefresh={loadData} />}

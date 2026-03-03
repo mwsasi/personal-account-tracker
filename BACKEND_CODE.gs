@@ -1,6 +1,6 @@
 
 /**
- * Personal Finance Tracker - Google Apps Script Backend
+ * Personal Finance Tracker - UPDATED Google Apps Script Backend
  */
 
 const SHEET_NAME = 'Transactions';
@@ -10,111 +10,95 @@ function setup() {
   let sheet = ss.getSheetByName(SHEET_NAME);
   if (!sheet) {
     sheet = ss.insertSheet(SHEET_NAME);
+    // Complete Header Row (21 Columns)
     sheet.appendRow([
-      'ID', 'Date', 'Month', 'Groceries', 'Vegetables', 
-      'FishEgg', 'Chicken', 'HouseRent', 'Electricity', 'Water', 'Travel', 'Others',
-      'DailyCash', 'BroughtForward', 'TotalExpenses', 'TotalBalance', 'Timestamp'
+      'ID', 'Date', 'Month', 'Brought Forward', 'Cash Received', 
+      'Groceries', 'Vegetables', 'Fish & Egg', 'Chicken', 'Fuel', 
+      'Parcel', 'Bike Repair', 'House Rent', 'Electricity', 'Water Bill', 
+      'Travel', 'Compound Investment', 'Others', 'Total Expenses', 
+      'Total Balance', 'Timestamp'
     ]);
+    sheet.setFrozenRows(1);
   }
-}
-
-function doOptions(e) {
-  return ContentService.createTextOutput("")
-    .setMimeType(ContentService.MimeType.TEXT)
-    .addHeader("Access-Control-Allow-Origin", "*")
-    .addHeader("Access-Control-Allow-Methods", "POST, GET, OPTIONS")
-    .addHeader("Access-Control-Allow-Headers", "Content-Type");
 }
 
 function doPost(e) {
   let data;
   try {
+    // Attempt to parse the incoming data
+    // When using fetch with mode: 'no-cors' and text/plain, the body arrives here.
     data = JSON.parse(e.postData.contents);
   } catch (err) {
-    return createJsonResponse({ status: 'error', message: 'Invalid JSON' });
+    return createJsonResponse({ status: 'error', message: 'Invalid JSON: ' + err.toString() });
   }
   
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(SHEET_NAME);
+  let sheet = ss.getSheetByName(SHEET_NAME);
+  if (!sheet) { setup(); sheet = ss.getSheetByName(SHEET_NAME); }
+  
   const action = data.action;
 
-  if (action === 'create') {
-    const id = Utilities.getUuid();
-    sheet.appendRow([
-      id, data.date, data.month, data.groceries, data.vegetables,
-      data.fishEgg, data.chicken, data.houseRent, data.electricity, data.water, data.travel, data.others,
-      data.dailyCash, data.broughtForward, data.totalExpenses, data.totalBalance, data.timestamp
+  if (action === 'sync') {
+    const records = data.records;
+    if (!Array.isArray(records)) return createJsonResponse({ status: 'error', message: 'Records must be an array' });
+    
+    // Clear everything except headers
+    if (sheet.getLastRow() > 1) {
+      sheet.getRange(2, 1, sheet.getLastRow() - 1, sheet.getLastColumn()).clearContent();
+    }
+    
+    if (records.length === 0) return createJsonResponse({ status: 'success', message: 'Sheet cleared' });
+
+    // Map JSON objects to spreadsheet rows
+    const rows = records.map(tx => [
+      tx.id || Utilities.getUuid(),
+      tx.date || "",
+      tx.month || "",
+      Number(tx.broughtForward || 0),
+      Number(tx.dailyCash || 0),
+      Number(tx.groceries || 0),
+      Number(tx.vegetables || 0),
+      Number(tx.fishEgg || 0),
+      Number(tx.chicken || 0),
+      Number(tx.fuel || 0),
+      Number(tx.parcel || 0),
+      Number(tx.bikeRepair || 0),
+      Number(tx.houseRent || 0),
+      Number(tx.electricity || 0),
+      Number(tx.water || 0),
+      Number(tx.travel || 0),
+      Number(tx.compoundInvestment || 0),
+      Number(tx.others || 0),
+      Number(tx.totalExpenses || 0),
+      Number(tx.totalBalance || 0),
+      tx.timestamp || new Date().toISOString()
     ]);
-    return createJsonResponse({ status: 'success', id: id });
+    
+    sheet.getRange(2, 1, rows.length, rows[0].length).setValues(rows);
+    return createJsonResponse({ status: 'success', count: rows.length });
   }
 
-  if (action === 'update') {
-    const values = sheet.getDataRange().getValues();
-    for (let i = 1; i < values.length; i++) {
-      if (values[i][0] == data.id) {
-        sheet.getRange(i + 1, 1, 1, 17).setValues([[
-          data.id, data.date, data.month, data.groceries, data.vegetables,
-          data.fishEgg, data.chicken, data.houseRent, data.electricity, data.water, data.travel, data.others,
-          data.dailyCash, data.broughtForward, data.totalExpenses, data.totalBalance, data.timestamp
-        ]]);
-        break;
-      }
-    }
-    return createJsonResponse({ status: 'success' });
-  }
-
-  if (action === 'delete') {
-    const values = sheet.getDataRange().getValues();
-    for (let i = 1; i < values.length; i++) {
-      if (values[i][0] == data.id) {
-        sheet.deleteRow(i + 1);
-        break;
-      }
-    }
-    return createJsonResponse({ status: 'success' });
-  }
-
-  if (action === 'register' || action === 'login') {
-     return createJsonResponse({ success: true, user: { id: "1", name: data.name || "User", email: data.email } });
-  }
-
-  return createJsonResponse({ status: 'error', message: 'Unknown action' });
+  return createJsonResponse({ status: 'error', message: 'Unknown action: ' + action });
 }
 
 function doGet(e) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(SHEET_NAME);
-  
-  if (!sheet) {
-    setup();
-    sheet = ss.getSheetByName(SHEET_NAME);
-  }
+  if (!sheet) { setup(); return createJsonResponse({ records: [] }); }
 
   const values = sheet.getDataRange().getValues();
-  if (values.length <= 1) {
-    return createJsonResponse({ records: [] });
-  }
+  if (values.length <= 1) return createJsonResponse({ records: [] });
   
   const headers = values[0];
   const records = [];
   
   const keyMap = {
-    'ID': 'id',
-    'Date': 'date',
-    'Month': 'month',
-    'Groceries': 'groceries',
-    'Vegetables': 'vegetables',
-    'FishEgg': 'fishEgg',
-    'Chicken': 'chicken',
-    'HouseRent': 'houseRent',
-    'Electricity': 'electricity',
-    'Water': 'water',
-    'Travel': 'travel',
-    'Others': 'others',
-    'DailyCash': 'dailyCash',
-    'BroughtForward': 'broughtForward',
-    'TotalExpenses': 'totalExpenses',
-    'TotalBalance': 'totalBalance',
+    'ID': 'id', 'Date': 'date', 'Month': 'month', 'Brought Forward': 'broughtForward',
+    'Cash Received': 'dailyCash', 'Groceries': 'groceries', 'Vegetables': 'vegetables',
+    'Fish & Egg': 'fishEgg', 'Chicken': 'chicken', 'Fuel': 'fuel', 'Parcel': 'parcel',
+    'Bike Repair': 'bikeRepair', 'House Rent': 'houseRent', 'Electricity': 'electricity',
+    'Water Bill': 'water', 'Travel': 'travel', 'Compound Investment': 'compoundInvestment',
+    'Others': 'others', 'Total Expenses': 'totalExpenses', 'Total Balance': 'totalBalance',
     'Timestamp': 'timestamp'
   };
 
@@ -125,15 +109,19 @@ function doGet(e) {
       const key = keyMap[cleanHeader] || cleanHeader.toLowerCase().replace(/\s+/g, '');
       let val = values[i][index];
       
-      if ((cleanHeader === 'Date' || key === 'date') && val instanceof Date) {
+      if ((key === 'date') && val instanceof Date) {
         val = Utilities.formatDate(val, ss.getSpreadsheetTimeZone(), "yyyy-MM-dd");
       }
       
-      const numericFields = ['groceries', 'vegetables', 'fishEgg', 'chicken', 'houseRent', 'electricity', 'water', 'travel', 'others', 'dailyCash', 'broughtForward', 'totalExpenses', 'totalBalance'];
-      if (numericFields.includes(key)) {
-        val = val === "" ? 0 : Number(val);
+      const numericKeys = [
+        'broughtForward', 'dailyCash', 'groceries', 'vegetables', 'fishEgg', 
+        'chicken', 'fuel', 'parcel', 'bikeRepair', 'houseRent', 
+        'electricity', 'water', 'travel', 'compoundInvestment', 
+        'others', 'totalExpenses', 'totalBalance'
+      ];
+      if (numericKeys.includes(key)) {
+        val = (val === "" || isNaN(val)) ? 0 : Number(val);
       }
-      
       record[key] = val;
     });
     records.push(record);

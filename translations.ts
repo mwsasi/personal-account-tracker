@@ -131,7 +131,15 @@ export const translations = {
     syncSuccess: "Dashboard investments synced!",
     useActualAverage: "Use Actual Monthly Average",
     recentInvestmentEntries: "Recent Investments",
-    parallelLog: "Parallel Log"
+    parallelLog: "Parallel Log",
+    cloudBackup: "Cloud Backup (Google Sheets)",
+    pushToCloud: "Push to Cloud",
+    fetchFromCloud: "Fetch from Cloud",
+    syncStarted: "Syncing data to Google Sheets...",
+    syncCompleted: "Data synced to cloud successfully!",
+    fetchCompleted: "Latest data fetched from cloud!",
+    continueWithGoogle: "Continue with Google",
+    or: "OR",
   },
   si: {
     title: "පුද්ගලික ගිණුම් වාර්තාව",
@@ -264,6 +272,14 @@ export const translations = {
     syncSuccess: "සමමුහුර්ත කරන ලදී",
     useActualAverage: "සැබෑ සාමාන්්‍යය භාවිතා කරන්න",
     recentInvestmentEntries: "මෑතකාලීන ආයෝජන",
-    parallelLog: "සමාන්තර සටහන"
+    parallelLog: "සමාන්තර සටහන",
+    cloudBackup: "වලාකුළු රක්ෂිතය (Google Sheets)",
+    pushToCloud: "වලාකුළට යවන්න",
+    fetchFromCloud: "වලාකුළෙන් ලබාගන්න",
+    syncStarted: "දත්ත සමමුහුර්ත කරමින්...",
+    syncCompleted: "දත්ත සාර්ථකව සමමුහුර්ත කරන ලදී!",
+    fetchCompleted: "නව දත්ත ලබාගන්නා ලදී!",
+    continueWithGoogle: "Google සමඟ ඉදිරියට යන්න",
+    or: "හෝ",
   }
 };
