@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "lint": "tsc --noEmit"
   },
   "dependencies": {
     "react": "19.0.0",
@@ -14,8 +15,7 @@
     "recharts": "3.6.0",
     "lucide-react": "0.462.0",
     "xlsx": "0.18.5",
-    "@google/genai": "1.35.0",
-    "@supabase/supabase-js": "2.45.4"
+    "@google/genai": "1.35.0"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",

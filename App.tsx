@@ -3,13 +3,11 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Transaction, Language, CurrencySettings, Notification } from './types.ts';
 import { translations } from './translations.ts';
 import { storageService } from './services/googleSheets.ts';
-import { supabase } from './supabaseClient.ts';
 import Dashboard from './components/Dashboard.tsx';
 import SettingsPage from './components/SettingsPage.tsx';
 import NotificationDrawer from './components/NotificationDrawer.tsx';
 import BillManager from './components/BillManager.tsx';
 import InvestmentTracker from './components/InvestmentTracker.tsx';
-import AuthForm from './components/AuthForm.tsx';
 import { Globe, Wallet, LayoutDashboard, History, BarChart3, Target, Settings, Bell, CreditCard, Sun, Moon, LogOut, RefreshCw, AlertCircle, CheckCircle2, TrendingUp, Loader2 } from 'lucide-react';
 
 interface ToastState {
@@ -18,15 +16,7 @@ interface ToastState {
 }
 
 const App: React.FC = () => {
-  const [user, setUser] = useState<{name: string, email: string} | null>(() => {
-    try {
-      const saved = localStorage.getItem('finance_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [isAuthLoading, setIsAuthLoading] = useState(true);
+  const [user, setUser] = useState<{name: string, email: string} | null>({ name: 'User', email: 'local@user' });
   const [lang, setLang] = useState<Language>(() => (localStorage.getItem('lang') as Language) || 'en');
   const [isDark, setIsDark] = useState(() => localStorage.getItem('theme') === 'dark');
   const [transactions, setTransactions] = useState<Transaction[]>([]);
@@ -54,55 +44,6 @@ const App: React.FC = () => {
     setToast({ message, type });
   }, []);
 
-  // Helper to update state based on Supabase user
-  const syncUser = useCallback((supabaseUser: any) => {
-    if (!isMounted.current) return;
-    
-    if (supabaseUser) {
-      const userData = { 
-        name: supabaseUser.user_metadata?.full_name || supabaseUser.email?.split('@')[0] || 'User', 
-        email: supabaseUser.email || '' 
-      };
-      localStorage.setItem('finance_user', JSON.stringify(userData));
-      setUser(userData);
-    } else {
-      localStorage.removeItem('finance_user');
-      setUser(null);
-    }
-    setIsAuthLoading(false);
-  }, []);
-
-  // Centralized Auth Listener
-  useEffect(() => {
-    // Initial check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      syncUser(session?.user ?? null);
-    }).catch(err => {
-      console.error("Session check error:", err);
-      setIsAuthLoading(false);
-    });
-
-    // Subscribe to all auth events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (!isMounted.current) return;
-      
-      console.log("Supabase Auth Event:", event);
-      
-      if (event === 'SIGNED_IN' || event === 'USER_UPDATED' || event === 'TOKEN_REFRESHED') {
-        syncUser(session?.user ?? null);
-        if (event === 'SIGNED_IN') {
-          showToast(t.welcomeBack, 'success');
-        }
-      } else if (event === 'SIGNED_OUT') {
-        syncUser(null);
-      }
-    });
-
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [syncUser, t.welcomeBack, showToast]);
-
   useEffect(() => {
     if (toast) {
       const timer = setTimeout(() => setToast(null), 4000);
@@ -125,45 +66,8 @@ const App: React.FC = () => {
   }, [isDark]);
 
   const handleLogout = async () => {
-    if (window.confirm(t.logout + "?")) {
-      // 1. Immediate UI update for responsiveness
-      setUser(null);
-      localStorage.removeItem('finance_user');
-      
-      try {
-        // 2. Perform server-side logout
-        await supabase.auth.signOut();
-      } catch (e) {
-        console.error("Logout error (likely already signed out):", e);
-      } finally {
-        showToast("Logged out successfully", 'info');
-      }
-    }
-  };
-
-  const handleLogin = async (email: string, pass: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password: pass,
-    });
-    if (error) throw error;
-  };
-
-  const handleRegister = async (name: string, email: string, pass: string) => {
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password: pass,
-      options: {
-        data: {
-          full_name: name,
-        }
-      }
-    });
-    if (error) throw error;
-    
-    if (!data.session) {
-      // Verification required - AuthForm handles this with the success state
-    }
+    // Logout functionality removed as per request
+    showToast("Logout disabled", 'info');
   };
 
   const formatCurrency = useCallback((amount: number) => {
@@ -368,20 +272,6 @@ const App: React.FC = () => {
   useEffect(() => {
     if (user) loadData();
   }, [user, loadData]);
-
-  // Loading Screen for Auth Session Check
-  if (isAuthLoading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-slate-50 dark:bg-slate-950">
-        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin mb-4" />
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest animate-pulse">Syncing Session...</p>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <AuthForm t={t} onLogin={handleLogin} onRegister={handleRegister} />;
-  }
 
   const navItems = [
     { id: 'dashboard', label: t.dashboard, icon: LayoutDashboard },
